@@ -8,12 +8,13 @@ SQUOT = '\''
 DQUOT = '"'
 ESCAP = '\\'
 NULL = ''
+SPEC = SQUOT + DQUOT + ESCAP + SPACE
 
 
 def prompt(state):
-    state_print(state)
-    cmd = parse_input(input('> '))
-
+    print_state(state)
+    cmds = parse_input(input('> '))
+    
 
 def print_state(state):
     for key, val in state.items():
@@ -48,10 +49,16 @@ def remove_escapes(string):
 
 
 def escaper(mode):
+    """ Builds escape mode, which doea nothing
+    except return the previous mode with no flag """
     return lambda char, index: (None, mode)
 
 
 def watchdog(flag_char, watch_chars):
+    """ Builds mode to initiate flag at flag_char,
+    initiate escape at \, initiate a new watch at
+    any of watch_char, or return itself without a
+    flag """
     def watch_x(char, index):
         if char == flag_char:
             return (None, flagger(index))
@@ -89,8 +96,21 @@ def parse_input(rawin):
             flags.append(flag)
     if (flag := mode('', len(rawin))[0]):
         flags.append(flag)
-    for start, stop in grouper([0] + flatten(flags) + [len(rawin)], 2):
+    start = 0
+    for i in range(len(rawin)):
+        if rawin[i] not in SPEC:
+            start = i
+            break
+    for start, stop in grouper([start] + flatten(flags) + [len(rawin)], 2):
         yield remove_escapes(rawin[start:stop])
 
-while not state['_exit_status']:
-    state = prompt(state)
+# while not state['_exit_status']:
+#     state = prompt(state)
+
+txt = ''
+while txt != 'quit':
+    g = parse_input(input(">"))
+    print(txt := next(g))
+    for e in g:
+        print(e)
+    
