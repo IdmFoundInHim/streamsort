@@ -1,6 +1,7 @@
 # StreamSort ©2019 IdmFoundInHim
 # Command Line Interface
-from itertools import zip_longest
+from itertools import zip_longest, chain
+from typing import Union, Tuple, Optional, Callable
 
 state = {'_exit_status': 0, "_var": {}}
 SPACE = ' '
@@ -14,13 +15,13 @@ SPEC = SQUOT + DQUOT + ESCAP + SPACE
 def prompt(state):
     print_state(state)
     cmds = parse_input(input('> '))
-    
+
 
 def print_state(state):
     for key, val in state.items():
         if type(val) is str:
             if key[0] != '_':
-               print(val, end=SPACE)
+                print(val, end=SPACE)
         elif type(val) is dict:
             try:
                 print(val['__str__'], end=SPACE)
@@ -31,8 +32,8 @@ def print_state(state):
                 print(val[0], end=SPACE)
 
 
-# grouper from itertools recipes,
-# https://docs.python.org/3.6/library/itertools.html#itertools-recipes
+# `grouper` and `flatten` from itertools recipes,
+# https://docs.python.org/3.8/library/itertools.html#itertools-recipes
 def grouper(iterable, n, fillvalue=None):
     "Collect data into fixed-length chunks or blocks"
     # grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx"
@@ -40,8 +41,9 @@ def grouper(iterable, n, fillvalue=None):
     return zip_longest(*args, fillvalue=fillvalue)
 
 
-def flatten(lst):
-    return [item for sublist in lst for item in sublist]
+def flatten(list_of_lists):
+    "Flatten one level of nesting"
+    return chain.from_iterable(list_of_lists)
 
 
 def remove_escapes(string):
@@ -49,17 +51,18 @@ def remove_escapes(string):
 
 
 def escaper(mode):
-    """ Builds escape mode, which doea nothing
+    """ Builds escape mode, which does nothing
     except return the previous mode with no flag """
     return lambda char, index: (None, mode)
 
 
 def watchdog(flag_char, watch_chars):
-    """ Builds mode to initiate flag at flag_char,
-    initiate escape at \, initiate a new watch at
+    """ Builds watch mode to initiate flag at flag_char,
+    initiate escape at \\, initiate a new watch at
     any of watch_char, or return itself without a
     flag """
     def watch_x(char, index):
+        """ See `watchdog.__doc__` """
         if char == flag_char:
             return (None, flagger(index))
         if char == ESCAP:
@@ -70,11 +73,23 @@ def watchdog(flag_char, watch_chars):
     return watch_x
 
 
-def flagger(start, end=None):
+def flagger(start: int,
+            end: Optional[int] = None) -> Tuple[Optional[List[int, int]],
+                                                Callable]:
+    """ Initiates/continues flag mode
+
+    In flag mode, a non-space character will end a flag (including it
+    as `OUT[0]`). Special characters expand the flag before ending it.
+    (`OUT[1]` will be a non-flag mode.)
+
+    A space expands the flag. `OUT[0] is None`, and `OUT[1]` will be a
+    new flagger -- expanding the existing flag.
+    """
     if end is None:
         end = start + 1
 
     def flag(char, index):
+        """ See `flagger.__doc__` """
         if char == SPACE:
             return (None, flagger(start, end + 1))
         if char in SQUOT + DQUOT + ESCAP:
@@ -104,13 +119,6 @@ def parse_input(rawin):
     for start, stop in grouper([start] + flatten(flags) + [len(rawin)], 2):
         yield remove_escapes(rawin[start:stop])
 
-# while not state['_exit_status']:
-#     state = prompt(state)
 
-txt = ''
-while txt != 'quit':
-    g = parse_input(input(">"))
-    print(txt := next(g))
-    for e in g:
-        print(e)
-    
+while not state['_exit_status']:
+    state = prompt(state)
