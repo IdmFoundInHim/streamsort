@@ -1,8 +1,12 @@
 import json
+import datetime as dt
 # from typing import
 
 import requests
 
+
+def is_oauth(oauth):
+    return type(oauth) is str and len(oauth) == 83
 
 def authorize(client64: str) -> str:
     """ Get OAuth key for requests to server.
@@ -13,16 +17,31 @@ def authorize(client64: str) -> str:
     for a new OAuth key. This will be stored with a timeout value in
     ./APIstate.json, and the OAuth will be returned.
     """
-    # INSERT read APIstate.json for authkey and return if not timed out
+    with open("APIstate.json", 'r') as local:
+        try:
+            localdict = json.load(local)
+        except json.decoder.JSONDecodeError:
+            localdict = {} 
+    if ('oauth' in localdict and 'timeout' in localdict
+        and dt.datetime.now() < dt.datetime.fromisoformat(localdict['timeout'])
+        and is_oauth(oauth := localdict['oauth'])) :
+        return oauth
     header = {
         "Authorization": f"Basic {client64}",
         "Content-Type": "application/x-www-form-urlencoded",
     }
     data = "grant_type=client_credentials"
+    requesttime = dt.datetime.now()
     oauth = requests.post("https://accounts.spotify.com/api/token",
-                          headers=header, data=data)
-    # INSERT write to APIstate.json
-    return oauth.json()['access_token']
+                          headers=header, data=data).json()
+    timeout = requesttime + dt.timedelta(seconds=int(oauth['expires_in']))
+    customjson = {
+        'oauth': (oauthkey := oauth['access_token']),
+        'timeout': timeout.isoformat()
+    }
+    with open("APIstate.json", 'w') as local:
+        json.dump(customjson, local) 
+    return oauthkey
 
 
 def getplaylist(oauth: str, playlist_id: str, limit: int = 512) -> dict:
@@ -44,6 +63,7 @@ def _test(playlist_id, debug=True):
         apikeys = json.load(apijson)
     client64 = apikeys['client64']
     oauth = authorize(client64)
+    breakpoint()
     playlist = getplaylist(oauth, playlist_id, 10)
     if debug:
         breakpoint()
