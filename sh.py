@@ -1,7 +1,7 @@
 # StreamSort ©2019 IdmFoundInHim
 # Command Line Interface
-from itertools import zip_longest, chain
-from typing import Union, Tuple, Optional, Callable
+from itertools import chain, zip_longest
+from typing import Callable, Optional, Tuple, Union
 
 state = {'_exit_status': 0, "_var": {}}
 SPACE = ' '
