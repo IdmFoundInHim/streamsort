@@ -1,3 +1,14 @@
+""" Functions for interacting with the Spotify API
+
+Major:
+* authorize: Get OAuth key for requests to server
+* get_playlist
+* get_track
+
+Helpful:
+* id_extractor: Extracts ID from URL/URI
+"""
+
 import datetime as dt
 import json
 import urllib.parse as urlparse
@@ -47,7 +58,7 @@ def authorize(client64: str) -> str:
     return oauthkey
 
 
-def getheader(oauth: str) -> dict:
+def get_header(oauth: str) -> dict:
     """ Returns header with given oauth for the Spotify API """
     return {
         "Accept": "application/json",
@@ -59,7 +70,7 @@ def getheader(oauth: str) -> dict:
 def request(oauth: str, url: str) -> dict:
     """ Makes Spotify non-account request with time/response logging"""
     reqtime = dt.datetime.now()
-    req = net.get(url, headers=getheader(oauth)).json())
+    req = net.get(url, headers=get_header(oauth)).json())
     if "error" in req:
         errtime = dt.datetime.now()
         with open("net.log", "a+") as err:
@@ -69,9 +80,9 @@ def request(oauth: str, url: str) -> dict:
     return req
 
 
-def get_playlist(oauth: str, playlist_id: str, limit: int = 512) -> list:
+def get_playlist(oauth: str, id: str, limit: int = 512) -> list:
     """ Gets the tracks in a playlist from Spotify
-    
+
     Each track dict includes:
     * `album.album_type` (single, EP, album)
     * `album.artists` (a list of dicts)
@@ -82,7 +93,7 @@ def get_playlist(oauth: str, playlist_id: str, limit: int = 512) -> list:
     * `linked_from` (only for songs with multiple versions)
     * `name`
     """
-    url = f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks?"
+    url = f"https://api.spotify.com/v1/playlists/{extract_id(id)}/tracks?"
     query = urlparse.urlencode({
         'fields': """
             items(track(
@@ -100,7 +111,7 @@ def get_playlist(oauth: str, playlist_id: str, limit: int = 512) -> list:
 
 
 # Build this using the generic request function
-def get_track(oauth: str, track_id: str) -> dict:
+def get_track(oauth: str, id: str) -> dict:
     """ Gets track organizational details
 
     The dict includes:
@@ -113,7 +124,7 @@ def get_track(oauth: str, track_id: str) -> dict:
     * `linked_from` (only for songs with multiple versions)
     * `name`
     """
-    url = f"https://api.spotify.com/v1/tracks/{track_id}?"
+    url = f"https://api.spotify.com/v1/tracks/{extract_id(id)}?"
     query = urlparse.urlencode({
         'fields': """
             album(
@@ -128,14 +139,22 @@ def get_track(oauth: str, track_id: str) -> dict:
     return request(oauth, url + query)
 
 
+def extract_id(keyword: str):
+    """ Extracts ID from URL/URI """
+    # These cut anything before a slash or colon
+    link = link.split(':')[-1]
+    link = link.split('/')[-1]
+    # Cuts anything from a question mark on
+    if '?' in link:
+        return link[0:link.index('?')]
+    return link
+
+
+
 # Enter playlist id to test
 def _test(playlist_id: str, debug=True):
     """ playlist can be the URI, URL, or ID """
-    playlist_id = playlist_id.replace('spotify:playlist:', '')
-    playlist_id = playlist_id.replace('https://open.spotify.com/playlist/', '')
-    if '?' in playlist_id:
-        playlist_id = playlist_id[0:playlist_id.index('?')]
-
+    id_extractor('playlist')(playlist_id)
     with open('APIkeys.json', 'r') as apijson:
         apikeys = json.load(apijson)
     client64 = apikeys['client64']
