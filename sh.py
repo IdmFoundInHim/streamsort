@@ -47,7 +47,7 @@ def flatten(list_of_lists):
 
 
 def remove_escapes(string):
-    return string.replace('\\', '')
+    return string.replace(ESCAP, NULL)
 
 
 def escaper(mode):

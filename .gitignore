@@ -3,3 +3,5 @@ APIkeys.json
 _*
 APIstate.json
 __pycache__/
+.vscode/
+*.log
