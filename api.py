@@ -12,7 +12,7 @@ Helpful:
 import datetime as dt
 import json
 import urllib.parse as urlparse
-from typing import Callable
+from typing import Tuple, Callable
 from textwrap import dedent
 
 import requests as net
@@ -70,17 +70,18 @@ def get_header(oauth: str) -> dict:
 def request(oauth: str, url: str) -> dict:
     """ Makes Spotify non-account request with time/response logging"""
     reqtime = dt.datetime.now()
-    req = net.get(url, headers=get_header(oauth)).json())
-    if "error" in req:
-        errtime = dt.datetime.now()
-        with open("net.log", "a+") as err:
-            err.write('\n'.join([str(reqtime), str(errtime), url, str(req)]))
-            err.write('\n' * 2)
-        return req
-    return req
+    req = net.get(url, headers=get_header(oauth))
+    errtime = dt.datetime.now()
+    if req.ok:
+        return req.json()
+    with open("net.log", "a+") as err:
+        err.write('\n'.join([str(reqtime), str(errtime), url, str(req)]))
+        err.write('\n' * 2)
+    req.raise_for_status()
+    
 
 
-def get_playlist(oauth: str, id: str, limit: int = 512) -> list:
+def get_playlist(oauth: str, id: str, limit: int = None) -> list:
     """ Gets the tracks in a playlist from Spotify
 
     Each track dict includes:
@@ -94,24 +95,26 @@ def get_playlist(oauth: str, id: str, limit: int = 512) -> list:
     * `name`
     """
     url = f"https://api.spotify.com/v1/playlists/{extract_id(id)}/tracks?"
-    query = urlparse.urlencode({
+    query = {
         'fields': """
             items(track(
                 album(
-                    album_type, artists(name, id), release_date,
-                    release_date_precision
+                    album_type, artists(name, id), name, id,
+                    release_date, release_date_precision
                 ),
                 artists(name, id), id, linked_from, name
             ))
         """.replace('\n', '').replace(' ', ''),
-        'limit': str(limit)
-    }, safe='()', quote_via=urlparse.quote)
+    }
+    if limit:
+        query['limit'] = limit
+    query = urlparse.urlencode(query, safe='()', quote_via=urlparse.quote)
     # quote_via=quote avoids pluses if space removal is removed/fails
     return request(oauth, url + query)['items']
 
 
 # Build this using the generic request function
-def get_track(oauth: str, id: str) -> dict:
+def get_track(oauth: str, playlist_id: str) -> dict:
     """ Gets track organizational details
 
     The dict includes:
@@ -139,7 +142,19 @@ def get_track(oauth: str, id: str) -> dict:
     return request(oauth, url + query)
 
 
-def extract_id(keyword: str):
+def get_album_length(oauth: str, id: str) -> Tuple[int, int, list]:
+    """ Returns details on the duration of an album
+    
+    By default, a tuple
+    """
+    url = (f"https://api.spotify.com/v1/albums/{extract_id(id)}/tracks?"
+           "fields=items(duration_ms)")
+    songs_duration = [s['duration_ms'] for s in request(oauth, url)['items']]
+    return (sum(songs_duration), len(songs_duration), songs_duration)
+
+
+
+def extract_id(link: str):
     """ Extracts ID from URL/URI """
     # These cut anything before a slash or colon
     link = link.split(':')[-1]
@@ -154,7 +169,7 @@ def extract_id(keyword: str):
 # Enter playlist id to test
 def _test(playlist_id: str, debug=True):
     """ playlist can be the URI, URL, or ID """
-    id_extractor('playlist')(playlist_id)
+    extract_id(playlist_id)
     with open('APIkeys.json', 'r') as apijson:
         apikeys = json.load(apijson)
     client64 = apikeys['client64']
