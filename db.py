@@ -4,10 +4,18 @@ from datetime import datetime as ts
 from datetime import timedelta as td
 from math import inf as infinity
 from string import ascii_letters, digits
-from typing import Callable, Optional, Tuple
+from typing import Any, Callable, Optional, Tuple
 
 ALPHANUM = ascii_letters + digits
 Season = Tuple[int, int]
+PUNCTUATION = ",;.!'\"`+*^-/\\%@:?&#()[]{}<>=~$"
+PRINTABLE = digits + ascii_letters + PUNCTUATION
+
+
+class DBSeasonGapError(ValueError):
+    """ The database contains seasons consecutive in name but not
+    date. """
+    pass
 
 
 class SeasonGapError(ValueError):
@@ -39,6 +47,26 @@ class SeasonDuplicateError(SeasonOrderError):
     """An attempted action would have created seasons with the same
     name. *Is a subtype of Order Error*"""
     pass
+
+
+def increment(obj):
+    if isinstance(obj, str):
+        return PRINTABLE[PRINTABLE.index(obj[-1]) + 1]
+    if isinstance(obj, complex):
+        realadd = obj.real / (obj.real + obj.imag)
+        return obj.real + realadd + obj.imag + (1 - realadd) * 1j
+    if isinstance(obj, (list, tuple, bytes, bytearray)):
+        return obj[:-1] + type(obj)([increment(obj[-1])])
+    if isinstance(obj, range):
+        return range(obj.start + 1, obj.stop + 1)
+    if isinstance(obj, (set, frozenset)):
+        return {increment(x) for x in obj}
+    if isinstance(obj, dict):
+        return {k:increment(v) for k, v in obj.items()}
+    if obj is None:
+        return
+    return obj + 1
+
 
 
 def initialize_library(location: str, dbname: str):
@@ -89,97 +117,116 @@ def add_season(library: sql.Connection, end: Optional[date] = None,
     1. Database is right more often than User
     2. Dates are right more often than Names
     """
-    dateread = library.cursor()
+    if library is not sql.Connection:
+        raise TypeError
     if end is None:
-        # All auto
-        prevname, prevdate = dateread.execute("""
-            SELECT name, end FROM guide
-            LIMIT 1
-            ORDER BY name DESC;
-        """).fetchone()
-        start, end = prevdate + td(days=1), date.today()
-        name = (prevseason := parse_name(prevname))[0], prevseason[1] + 1
+        return add_season(library, *add_season_default_end(library))
+    elif start is None:
+        return add_season(library, end, add_season_default_start(end))
+    elif name is None:
+        name = add_season_default_name(library, end, start)
+    add_season_validate()
+
+
+def add_season_default_end(library: sql.Connection) -> Tuple[date, date,
+                                                             Tuple[int, int]]:
+    prevname, prevdate = library.cursor().execute("""
+        SELECT name, end FROM guide
+        LIMIT 1
+        ORDER BY name DESC;
+    """).fetchone()
+    return (date.today(), prevdate + td(days=1),
+    ((prevseason := parse_name(prevname))[0], prevseason[1] + 1))
+
+
+def add_season_default_start(library: sql.Connection, end: date) -> date:
+    year_seasons = library.cursor().execute("""
+        SELECT start, end FROM guide
+        WHERE name LIKE ?
+        WHERE start <= ?
+        ORDER BY name DESC;
+    """, (f'S{end.year}%', end))
+    prev = date(end.year - 1, 12, 31)
+    for s in year_seasons:
+        if s[0] <= end and not s[1] < end:
+            raise SeasonIntersectionError
+        if s[1] > end:
+            return prev[2] + td(days=1)
+        prev = s
+    return date(end.year, 12, 31)
+
+
+def add_season_default_name(library: sql.Connection, end: date, start: date):
+    dateread = library.cursor()
+    prevs = dateread.execute("""
+        SELECT name, start, end FROM guide
+        WHERE name LIKE ?
+        WHERE end < ?
+        ORDER BY name DESC
+        LIMIT 1;
+    """, (f'{end.year}%', start)).fetchone()
+    nexts = dateread.execute("""
+        SELECT name, start, end FROM guide
+        WHERE name LIKE ?
+        WHERE start > ?
+        ORDER BY name ASC
+        LIMIT 1
+    """, (f'{end.year}%', prevs[2])).fetchone()
+    name_nums = [parse_name(prevs[0])[1], parse_name(nexts[0])[1]]
+    if prevs[2] + td(days=1) == start:
+        return (end.year, name_nums[0] + 1)
+    elif nexts[1] - td(days=1) == end:
+        return (end.year, name_nums[1] - 1)
     else:
-        # end determines start.year, name[0]
-        year_seasons = dateread.execute("""
-            SELECT name, start, end FROM guide
-            WHERE name LIKE ?
-            ORDER BY name DESC;
-        """, f'S{end.year}%')
-        prev = (f"{end.year}-0", date(end.year - 1, 12, 31),
-                date(end.year - 1, 12, 31))
-        nexts = None
-        for s in year_seasons:
-            if s[1] <= end and not s[2] < end:
-                raise SeasonIntersectionError
-            if s[1] > end:
-                nexts = s
-                break
-            prev = s
-        prev_name = parse_name(prev[0])
-        if nexts is not None:
-            nexts_name = parse_name(nexts[0])
-        else:
-            nexts_name = (end.year, 53)
-        if start is None:
-            assert prev_name[0] == end.year
-            start, name = prev[2] + td(days=1), (end.year, prev_name[1] + 1)
-            if nexts is not None and nexts_name <= name:
-                return set_refactor_gap(library, end.year, rerun=add_season,
-                                        params=[library, end, start, name])
-        else:
-            if start >= end or start.year != end.year:
-                raise ValueError
-            if prev[2] >= start:
-                raise SeasonIntersectionError
+        return (end.year, name_nums[0] + 2)
 
-            if prev[2] + td(days=1) == start:
-                name_req = (end.year, prev_name[1] + 1)
-                if nexts_name == name_req:
-                    return set_refactor_gap(library, end.year,
-                                            rerun=add_season,
-                                            params=[library, end, start, name])
-                if (nexts[1] - td(days=1) == end
-                   and name_req != (end.year,
-                                    nexts_name[1] - 1)):
-                    raise SeasonMissingError
-            elif nexts[1] - td(days=1) == end:
-                name_req = (end.year, nexts_name[1] - 1)
-                if prev_name == name_req:
-                    return set_refactor_gap(library, end.year,
-                                            rerun=add_season,
-                                            params=[library, end, start, name])
-                if prev_name[1] - 1 == name_req[1]:
-                    raise SeasonGapError
-            elif name is not None:
-                if name < prev_name or name > nexts_name:
-                    raise SeasonOrderError
-                if name == prev_name or name == nexts_name:
-                    raise SeasonDuplicateError
-                if name[1] == prev_name[1] + 1 or name[1] == nexts_name[1] - 1:
-                    raise SeasonGapError
-                name_req = None
-            else:
-                name = (end.year, prev_name[1] + 2)
-                if name[1] == nexts_name[1] - 1:
-                    raise SeasonGapError
-                if name[1] == nexts_name[1]:
-                    raise SeasonDuplicateError
-                name_req = None
 
-            if name is None:
-                # i.e. if name is automatic and season is contiguous
-                name = name_req
-            if name_req is not None and name != name_req:
-                # i.e. if name is manual and season is contiguous
-                if name < prev_name or name > nexts_name:
-                    raise SeasonOrderError
-                if name == prev_name or name == nexts_name:
-                    raise SeasonDuplicateError
-                else:
-                    raise SeasonMissingError
 
-    write = library.cursor()
+def add_season_validate(library: sql.Connection, end: date, start: date,
+                        name: Season):
+    """ Rules:
+    1. Check for blatantly invalid dates
+    1. Check for SeasonIntersection
+    1. Check for SeasonGap/Missing/Order
+    """
+    if not all(isinstance(end, date) and isinstance(start, date) 
+               and isinstance(name, Tuple)):
+        raise TypeError
+    if end <= start:
+        raise ValueError
+    dbread = library.cursor()
+    if not start.year == end.year == name[0]:
+        raise ValueError
+
+    if dbread.execute("SELECT name WHERE name LIKE ?",
+                      (f'S{name[0]}-{name[1]}')).fetchone():
+        raise SeasonDuplicateError
+
+    year_seasons = dbread.execute("""
+        SELECT name, start, end
+        WHERE name LIKE ?
+        SORT BY name ASC
+    """, (f'S{name[0]}%')).fetchall()
+    for s in year_seasons:
+        if s[1] < end and s[2] > start:
+            raise SeasonIntersectionError
+        if s[1] > end:
+            nexts = s
+            break
+        prevs = s
+
+    approved_nums = range(parse_name(nexts[0])[1] + 1, parse_name(prevs[0])[1])
+    if name[1] not in approved_nums:
+        raise SeasonOrderError
+
+    adjacent_start = prevs[2] + 1 == start
+    adjacent_end = nexts[1] - 1 == end
+    if len(approved_nums) < 1:
+        raise DBSeasonGapError
+    if adjacent_start and adjacent_end and len(approved_nums) != 1:
+        raise SeasonMissingError
+    if len(approved_nums) < 3 - adjacent_start - adjacent_end:
+        raise SeasonGapError
 
 
 def set_refactor_gap(library, year,
