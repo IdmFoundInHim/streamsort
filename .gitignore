@@ -5,3 +5,5 @@ APIstate.json
 __pycache__/
 .vscode/
 *.log
+.cache-*
+env/

@@ -1,3 +1,5 @@
+# Copyright (c) 2020 IdmFoundInHim, under MIT license
+
 import sqlite3 as sql
 from datetime import date
 from datetime import datetime as ts

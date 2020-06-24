@@ -1,124 +1,72 @@
-# StreamSort ©2019 IdmFoundInHim
-# Command Line Interface
-from itertools import chain, zip_longest
-from typing import Callable, Optional, Tuple, Union
+""" Copyright (c) 2020 IdmFoundInHim, under MIT license
 
-state = {'_exit_status': 0, "_var": {}}
-SPACE = ' '
-SQUOT = '\''
-DQUOT = '"'
-ESCAP = '\\'
-NULL = ''
-SPEC = SQUOT + DQUOT + ESCAP + SPACE
+Basic rules:
+    * Spaces seperate tokens as each line is interpreted left-to-right
+    * Symbols have no special meaning to avoid interfering with music
+      object (track, album, playlist, artist) names
+    * The main state variable is the active subject/location which is
+      a user or a music object ("mob")
+    * Variables are implemented as subshells
+        A subshell is a copy of the current state. Commands can be run
+        one at a time to utilize and modify the subshell from the main
+        shell, and the subshell can be loaded to the main state. More
+        details are below.
+    * All tokens can be processed without subsequent tokens
+    * Subshell names are a secondary state variable that extend the
+      reserved tokens
+    * All functions take one parameter
 
+All reserved keywords:
+    Functions: get, open, all, add, play, new, remove
+        Builtins: shuffle, projects
+    Control: in, after, track, nom
 
-def prompt(state):
-    print_state(state)
-    cmds = parse_input(input('> '))
+Control Syntax:
+    Basic `> {function} Parameter is Remainder of Line`
+    Subshell Initiation `> subshell-name {Line-Optional}`
+        (Yes, `subsh subsub trisub` is valid)
+    Subshell Extension `> in subshell-name {Line}`
+    Subshell Loading `> subshell-name`
+    Pipeline `> {function-Optional} after {Line}`
+        This will pass the output of Line to function. Without function,
+        after is superfluous.
+    Subject Reference `> {function-Optional} track {Number}`
+        Gets the Number-th track of the open mob, passing it to unction
+        or returning it
+    Escape `{function} nom Parameter Starting With Reserved Token`
+        Drops interpreter into free mode from branch mode
+        (Yes, `open nom nom` is valid)
 
+Subshells:
+    When a non-reserved token appears anywhere a reserved token is
+    required (e.g. opening a line), a new subshell is created. The
+    subshell inherits the active state, and the remainder of the line is
+    run as a new line. Any state changes will affect the subshell state
+    and not the main state. The subshell is added to the main state as
+    a token-state pair of the first token and the subshell state,
+    respectively.
 
-def print_state(state):
-    for key, val in state.items():
-        if type(val) is str:
-            if key[0] != '_':
-                print(val, end=SPACE)
-        elif type(val) is dict:
-            try:
-                print(val['__str__'], end=SPACE)
-            except KeyError:
-                pass
-        elif type(val) in (list, tuple):
-            if val != []:
-                print(val[0], end=SPACE)
+    Then, the subshell can be invoked one of two ways. Typically, the in
+    keyword will be used (`in subsh {function}...`), to run a function
+    extending the subshell. Any references in the parameter, like
+    `track 4` or `othersubshell`, will use the main state, but the
+    function will use and/or change the subshell state. Additionally,
+    a subshell may be used as the first token of a line to load the
+    subshell state into the main state.
 
+    The idiom for loading a subshell while saving the main state is as
+    follows, with an arbitrary name for backtomain:
+    ```streamx
+    > in subsh backtomain
+    > subsh
+    ```
+    Use `> backtomain` to restore the original state.
 
-# `grouper` and `flatten` from itertools recipes,
-# https://docs.python.org/3.8/library/itertools.html#itertools-recipes
-def grouper(iterable, n, fillvalue=None):
-    "Collect data into fixed-length chunks or blocks"
-    # grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx"
-    args = [iter(iterable)] * n
-    return zip_longest(*args, fillvalue=fillvalue)
+Implementation:
+    * The interpreter reads in one of three modes:
+      1. reserved: Expecting a keyword
+      2. free: Expecting words that are part of a parameter
+      3. branch: Watching for keywords, but otherwise acts like free
+    * In reserved mode, non-reserved tokens are new subshell names
+"""
 
-
-def flatten(list_of_lists):
-    "Flatten one level of nesting"
-    return chain.from_iterable(list_of_lists)
-
-
-def remove_escapes(string):
-    return string.replace(ESCAP, NULL)
-
-
-def escaper(mode):
-    """ Builds escape mode, which does nothing
-    except return the previous mode with no flag """
-    return lambda char, index: (None, mode)
-
-
-def watchdog(flag_char, watch_chars):
-    """ Builds watch mode to initiate flag at flag_char,
-    initiate escape at \\, initiate a new watch at
-    any of watch_char, or return itself without a
-    flag """
-    def watch_x(char, index):
-        """ See `watchdog.__doc__` """
-        if char == flag_char:
-            return (None, flagger(index))
-        if char == ESCAP:
-            return (None, escaper(watch_x))
-        if char in watch_chars:
-            return (None, watchdog(char, NULL))
-        return (None, watch_x)
-    return watch_x
-
-
-def flagger(start: int,
-            end: Optional[int] = None) -> Tuple[Optional[List[int, int]],
-                                                Callable]:
-    """ Initiates/continues flag mode
-
-    In flag mode, a non-space character will end a flag (including it
-    as `OUT[0]`). Special characters expand the flag before ending it.
-    (`OUT[1]` will be a non-flag mode.)
-
-    A space expands the flag. `OUT[0] is None`, and `OUT[1]` will be a
-    new flagger -- expanding the existing flag.
-    """
-    if end is None:
-        end = start + 1
-
-    def flag(char, index):
-        """ See `flagger.__doc__` """
-        if char == SPACE:
-            return (None, flagger(start, end + 1))
-        if char in SQUOT + DQUOT + ESCAP:
-            return ([start, end + 1], default(char, index)[1])
-        else:
-            return ([start, end], default)
-    return flag
-
-
-default = watchdog(SPACE, SQUOT + DQUOT)
-
-
-def parse_input(rawin):
-    mode = default
-    flags = []
-    for i in range(len(rawin)):
-        flag, mode = mode(rawin[i], i)
-        if flag:
-            flags.append(flag)
-    if (flag := mode('', len(rawin))[0]):
-        flags.append(flag)
-    start = 0
-    for i in range(len(rawin)):
-        if rawin[i] not in SPEC:
-            start = i
-            break
-    for start, stop in grouper([start] + flatten(flags) + [len(rawin)], 2):
-        yield remove_escapes(rawin[start:stop])
-
-
-while not state['_exit_status']:
-    state = prompt(state)
