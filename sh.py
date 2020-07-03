@@ -70,3 +70,28 @@ Implementation:
     * In reserved mode, non-reserved tokens are new subshell names
 """
 
+import os
+from typing import Tuple
+
+from spotipy import Spotify
+from spotipy import SpotifyImplicitGrant as SpotifyAuth
+
+from constants import CACHE_PATH, CLIENT_ID, REDIRECT_URI
+
+
+def login() -> Tuple[Spotify, dict]:
+    """ Returns an authorized Spotify object and user details """
+    spotify = Spotify(auth_manager=SpotifyAuth(client_id=CLIENT_ID,
+                                               redirect_uri=REDIRECT_URI,
+                                               cache_path=CACHE_PATH))
+    user = spotify.me()
+    return spotify, user
+
+def logout() -> int:
+    """ Removes cache, returning a truthy value only if removal fails
+    """
+    try:
+        os.remove(CACHE_PATH)
+        return 0
+    except FileNotFoundError:
+        return 1
