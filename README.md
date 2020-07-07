@@ -2,20 +2,19 @@
 
 ## Aim
 
-Automatically catalog ranked projects into a database from playlists
-to enable long-term preservation, detailed analytics, dynamic
-organization and publishing.
+Provide tools for interactive and automated processing of Spotify
+playlists, including
 
-## External Resources
+* Preservation
+  * Digital Backup
+  * Mapping Spotify music to other platforms
+* Dynamic Organization
+  * Custom shuffle algorithms
+  * Playlist Generation — find songs from your library based on criteria
+  * Advanced Playlist Editing
 
-- Spotify API
-- MySQL
+## Necessary Resources
 
-## Implementation Plan (Summary)
-
-Use a Python installer to unpack the program's scripts, initiate a
-database in the curent directory, and securely store API authentication.
-Scripts include:
-- One to be run at regular intervals to update the database with any
-  new/changed rankings.
-- A command line interface for analyzing the database
+- Spotify API, accessed through [Spotipy](https://github.com/plamere/spotify)
+- SQL processing, included in standard Python library as sqlite3
+- HTTP support, provided by [Requests](https://github.com/psf/requests)
