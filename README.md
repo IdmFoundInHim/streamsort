@@ -1,4 +1,4 @@
-# StreamSort [Project Briefing]
+# StreamSort
 
 ## Aim
 

@@ -1,10 +1,8 @@
-APIkeys.json
-.gitsecret/randomseed
-_*
-APIstate.json
 __pycache__/
-.vscode/
-*.log
-.cache-*
 env/
 .cache/
+.cache-*
+APIkeys.json
+APIstate.json
+_notes*
+_exp*
