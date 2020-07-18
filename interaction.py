@@ -1,6 +1,10 @@
-def notify_user(notification: str) -> None:
-    print(notification)
+""" Default I/O functions for StreamSort
 
+Copyright (c) 2020 IdmFoundInHim
+"""
+
+notify_user = print
 
 def confirm_action(message: str) -> bool:
-    return input(message)[0] in 'Yy'
+    """ Basic (Y/n)? wrapper for `input` """
+    return input(message)[0:1] in 'Yy'

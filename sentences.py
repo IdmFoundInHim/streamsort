@@ -44,15 +44,15 @@ def ss_open(subject: Subject, query: str) -> Subject:
     >>> sub = ss_open(sub,
     ...    "album:Only Love Remains artist:JJ Heller track:Love Me")
     >>> sub[1]['name']
-    Love Me
+    'Love Me'
     >>> sub[1]['album']['name']
-    Only Love Remains
+    'Only Love Remains'
 
     Playlist search ignores other tags, but may produce strange results
     if other tags are included
     >>> sub = ss_open(sub, "playlist:Star Wars track:Soundtracks")
     >>> sub[1]['owner']['id']
-    khrpgai88r1q1nr12k4f6r2qz
+    'khrpgai88r1q1nr12k4f6r2qz'
 
     To allow quick, adaptive searching, results are prioritized as
     follows:
@@ -76,6 +76,11 @@ def ss_open(subject: Subject, query: str) -> Subject:
     No Tags
 
     Alternates between Track/Album/Artist and Playlist
+
+    When a selection is made, `io_notify` will be called to inform the
+    user. For selections with less certainty, `io_confirm` will be used
+    to check with the user before finalizing the selection. Custom I/O
+    functions may be supplied through `io_inject`.
     """
     out = _ss_open_process_query(query)(subject, query)
     if out is None:
@@ -265,5 +270,6 @@ if __name__ == "__main__":
     import sh
     sp, usr = sh.login()
     sub = (sp, None)
+    io_inject(lambda x: True)
     import doctest
     doctest.testmod()

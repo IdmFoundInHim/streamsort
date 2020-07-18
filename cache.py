@@ -5,7 +5,6 @@ Copyright (c) 2020 IdmFoundInHim
 
 import json
 from datetime import datetime as dt
-from typing import Optional
 
 from spotipy import Spotify
 try:
@@ -15,7 +14,7 @@ except ImportError:
 from utilities import results_generator
 
 
-def liked_songs_cache_check(api: Spotify):
+def liked_songs_cache_check(api: Spotify) -> dict:
     """ Get a dict of the cached liked songs list, updating if needed
 
     All fields are calculated from saved *tracks*, so an album or artist
@@ -34,7 +33,7 @@ def liked_songs_cache_check(api: Spotify):
             cached = json.load(cache)
     except FileNotFoundError:
         cached = {'as_of': '1970-01-01T00:00:00'}
-    latest = api.current_user_saved_tracks()
+    latest: dict = api.current_user_saved_tracks()
     if ((dt.now() - dt.fromisoformat(cached['as_of'])).days > 6
             or latest['total'] != cached['total']):
         _liked_songs_cache_save(api.auth_manager, latest)
@@ -42,17 +41,17 @@ def liked_songs_cache_check(api: Spotify):
     return cached
 
 
-def _liked_songs_cache_save(auth: SpotifyPKCE, page_zero: dict):
+def _liked_songs_cache_save(auth: SpotifyPKCE, page_zero: dict) -> None:
     pending = {}
     pending['total'] = page_zero['total']
     pending['as_of'] = dt.now().isoformat()
     tracks, albums, artists = set(), set(), set()
-    for t in results_generator(auth, page_zero):
-        t = t['track']
-        tracks.add(t['id'])
-        albums.add(t['album']['id'])
-        for a in t['artists']:
-            artists.add(a['id'])
+    for result in results_generator(auth, page_zero):
+        track = result['track']
+        tracks.add(track['id'])
+        albums.add(track['album']['id'])
+        for artist in track['artists']:
+            artists.add(artist['id'])
     pending['track'] = list(tracks)
     pending['album'] = list(albums)
     pending['artist'] = list(artists)
