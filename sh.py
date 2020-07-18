@@ -28,8 +28,9 @@ Control Syntax:
     Subshell Extension `> in subshell-name {Line}`
     Subshell Loading `> subshell-name`
     Pipeline `> {function-Optional} after {Line}`
-        This will pass the output of Line to function. Without function,
-        after is superfluous.
+        This will pass the output (resulting subject) of Line to
+        function as the parameter. Without function, after is
+        superfluous.
     Subject Reference `> {function-Optional} track {Number}`
         Gets the Number-th track of the open mob, passing it to unction
         or returning it
@@ -74,18 +75,23 @@ import os
 from typing import Tuple
 
 from spotipy import Spotify
-from spotipy import SpotifyImplicitGrant as SpotifyAuth
+try:
+    from spotipy import SpotifyPKCE as SpotifyAuth
+except ImportError:
+    from spotipy import SpotifyImplicitGrant as SpotifyAuth
 
-from constants import CACHE_PATH, CLIENT_ID, REDIRECT_URI
+from constants import CACHE_PATH, CLIENT_ID, REDIRECT_URI, SCOPE
 
 
 def login() -> Tuple[Spotify, dict]:
     """ Returns an authorized Spotify object and user details """
     spotify = Spotify(auth_manager=SpotifyAuth(client_id=CLIENT_ID,
                                                redirect_uri=REDIRECT_URI,
-                                               cache_path=CACHE_PATH))
+                                               cache_path=CACHE_PATH,
+                                               scope=SCOPE))
     user = spotify.me()
     return spotify, user
+
 
 def logout() -> int:
     """ Removes cache, returning a truthy value only if removal fails
@@ -93,5 +99,5 @@ def logout() -> int:
     try:
         os.remove(CACHE_PATH)
         return 0
-    except FileNotFoundError:
+    except OSError:
         return 1

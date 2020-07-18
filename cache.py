@@ -1,8 +1,17 @@
+""" Caching functions for StreamSort
+
+Copyright (c) 2020 IdmFoundInHim
+"""
+
 import json
 from datetime import datetime as dt
 from typing import Optional
 
-from spotipy import Spotify, SpotifyImplicitGrant
+from spotipy import Spotify
+try:
+    from spotipy import SpotifyPKCE
+except ImportError:
+    from spotipy import SpotifyImplicitGrant as SpotifyPKCE
 from utilities import results_generator
 
 
@@ -33,7 +42,7 @@ def liked_songs_cache_check(api: Spotify):
     return cached
 
 
-def _liked_songs_cache_save(auth: SpotifyImplicitGrant, page_zero: dict):
+def _liked_songs_cache_save(auth: SpotifyPKCE, page_zero: dict):
     pending = {}
     pending['total'] = page_zero['total']
     pending['as_of'] = dt.now().isoformat()
