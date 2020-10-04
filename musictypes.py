@@ -22,6 +22,6 @@ def str_mob(mob: Mob):
     }
     mob_fields = [mob['name'],
                   mob.get('artists', [{'name': ''}])[0]['name'],
-                  len(mob.get('items', []))
+                  mob.get('total_tracks')
                   or mob.get('tracks', {'total': ''})['total']]
     return mob_strs[mob['type']].format(*mob_fields)

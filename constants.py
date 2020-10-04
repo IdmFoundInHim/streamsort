@@ -5,4 +5,5 @@ REDIRECT_URI = "http://localhost:8080"
 CACHE_PATH = os.path.join('.cache', 'api.json')
 MOBNAMES = ['track', 'album', 'artist', 'playlist']
 NUMSUGGESTIONS = 3
-SCOPE = 'user-library-read user-follow-read'
+SCOPE = ('user-library-read user-follow-read playlist-read-private '
+         'playlist-modify-private playlist-modify-public')

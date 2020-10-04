@@ -7,10 +7,7 @@ from typing import Iterator
 from itertools import cycle, islice
 
 import requests
-try:
-    from spotipy import SpotifyPKCE
-except ImportError:
-    from spotipy import SpotifyImplicitGrant as SpotifyPKCE
+from spotipy import SpotifyPKCE
 
 from constants import MOBNAMES
 from musictypes import Mob
@@ -40,11 +37,14 @@ def results_generator(auth: SpotifyPKCE, page_zero: dict) -> Iterator[Mob]:
             page = page_r.json()
             yield from page['items']
         except requests.exceptions.HTTPError:
+            if 'offset=2000' in nexturl:
+                return
             header = get_header(auth.get_access_token(check_cache=False))
             page = {'next': nexturl}
         except KeyError:
             key = next((n + 's' for n in MOBNAMES if n + 's' in page), 'items')
-            yield from page[key]['items']
+            page = page[key]
+            yield from page['items']
 
 
 def roundrobin(*iterables):

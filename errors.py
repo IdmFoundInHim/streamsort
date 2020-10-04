@@ -4,4 +4,4 @@ Copyright (c) 2020 IdmFoundInHim
 """
 
 class NoResultsException(Exception):
-    """ A Spotify seach returned no results """
+    """ A Spotify search returned no results """

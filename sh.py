@@ -72,20 +72,15 @@ Implementation:
 """
 
 import os
-from typing import Tuple
 
-from spotipy import Spotify
-try:
-    from spotipy import SpotifyPKCE as SpotifyAuth
-except ImportError:
-    from spotipy import SpotifyImplicitGrant as SpotifyAuth
+from spotipy import Spotify, SpotifyPKCE
 
 from constants import CACHE_PATH, CLIENT_ID, REDIRECT_URI, SCOPE
 
 
-def login() -> Tuple[Spotify, dict]:
+def login() -> tuple[Spotify, dict]:
     """ Returns an authorized Spotify object and user details """
-    spotify = Spotify(auth_manager=SpotifyAuth(client_id=CLIENT_ID,
+    spotify = Spotify(auth_manager=SpotifyPKCE(client_id=CLIENT_ID,
                                                redirect_uri=REDIRECT_URI,
                                                cache_path=CACHE_PATH,
                                                scope=SCOPE))

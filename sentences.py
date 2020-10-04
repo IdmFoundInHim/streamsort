@@ -3,7 +3,7 @@
 Copyright (c) 2020 IdmFoundInHim
 """
 import itertools as itools
-from typing import Callable, Iterator, Optional, Tuple, cast
+from typing import Callable, Iterator, Optional, cast
 
 from spotipy import Spotify
 
@@ -15,7 +15,7 @@ from musictypes import Album, Artist, Mob, Playlist, Track, str_mob
 from utilities import results_generator, roundrobin
 
 LIMIT = 50
-Subject = Tuple[Spotify, dict]
+Subject = tuple[Spotify, dict]
 TypeSpecificSearch = Callable[[Subject, str], Optional[Mob]]
 MultipleChoiceFunction = Callable[[Iterator[Mob]], Optional[Mob]]
 
@@ -108,18 +108,20 @@ def _ss_open_process_query(query: str) -> TypeSpecificSearch:
 def _ss_open_general(subject: Subject, query: str) -> Optional[Mob]:
     api = subject[0]
     results = api.search(query, LIMIT, type=','.join(MOBNAMES))
-    results = {x: _ss_open_familiar(api.auth_manager, results[x + 's'], x)
+    results = {x: _ss_open_familiar(api, results[x + 's'], x)
                   if x != 'playlist'
-                  else _ss_open_playlist_familiar(api, results)
+                  else _ss_open_playlist_familiar(api, results['playlists'])
                for x in MOBNAMES}
     for mobtypes in itools.cycle([[x for x in MOBNAMES if x != 'playlist'],
                                   ['playlist']]):
         result_gens = [_ss_open_genlen(next(results[t])) for t in mobtypes]
         num_results = sum(tup[0] for tup in result_gens)
         if num_results == 1:
-            return _ss_open_notifyuser(next(roundrobin(*result_gens)))
+            return _ss_open_notifyuser(next([t[1]for t in result_gens
+                                             if t[0]][0]))
         if num_results:
-            user_select = _ss_open_userinput(roundrobin(*result_gens))
+            user_select = _ss_open_userinput(roundrobin(*[t[1] for t
+                                                          in result_gens]))
             if user_select:
                 return user_select
     return None
@@ -131,7 +133,8 @@ def _ss_open_playlist(subject: Subject, query: str) -> Optional[Playlist]:
     results = _ss_open_playlist_familiar(api, results)
     num_results, results_familiar = _ss_open_genlen(next(results))
     if num_results:
-        return cast(Optional[Playlist], _ss_open_notifyuser(next(results)))
+        return cast(Optional[Playlist],
+                    _ss_open_notifyuser(next(results_familiar)))
     results_f1, results_f2 = itools.tee(next(results))
     first_result = next(results_f1, None)
     if first_result and all(z[0] == z[1] for z in zip(first_result['name'],
@@ -219,13 +222,13 @@ def _ss_open_artist(variation: MultipleChoiceFunction) -> TypeSpecificSearch:
     return get_artist
 
 
-def _ss_open_genlen(generator: Iterator) -> Tuple[int, Iterator]:
+def _ss_open_genlen(generator: Iterator) -> tuple[int, Iterator]:
     scan_copy, return_copy = itools.tee(generator)
-    one_result = next(scan_copy, False)
-    if next(scan_copy, False) is not False:
+    one_result = next(scan_copy, None)
+    if next(scan_copy, None) is not None:
         val = 2
     else:
-        val = int(one_result is not False)
+        val = int(one_result is not None)
     del scan_copy
     return val, return_copy
 
@@ -234,7 +237,8 @@ def _ss_open_familiar(api: Spotify, results: dict,
                       mobname: str) -> Iterator[Iterator[Mob]]:
     yield (r for r in results_generator(api.auth_manager, results)
            if any(api.current_user_following_artists(a['id'] for a
-                                                     in r.get('artists', r))))
+                                                     in r.get('artists', [r])))
+           )
     liked_songs = liked_songs_cache_check(api)
     yield (r for r in results_generator(api.auth_manager, results)
            if r['id'] in liked_songs[mobname])

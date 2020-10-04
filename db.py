@@ -6,10 +6,10 @@ from datetime import datetime as ts
 from datetime import timedelta as td
 from math import inf as infinity
 from string import ascii_letters, digits
-from typing import Any, Callable, Optional, Tuple
+from typing import Any, Callable, Optional
 
 ALPHANUM = ascii_letters + digits
-Season = Tuple[int, int]
+Season = tuple[int, int]
 PUNCTUATION = ",;.!'\"`+*^-/\\%@:?&#()[]{}<>=~$"
 PRINTABLE = digits + ascii_letters + PUNCTUATION
 def SEASON_ZERO(y, wrap=str):
@@ -145,8 +145,8 @@ def add_season(library: sql.Connection, end: Optional[date] = None,
 
 
 
-def add_season_default_end(library: sql.Connection) -> Tuple[date, date,
-                                                             Tuple[int, int]]:
+def add_season_default_end(library: sql.Connection) -> tuple[date, date,
+                                                             tuple[int, int]]:
     prevs = library.cursor().execute("""
         SELECT name, end FROM guide
         ORDER BY name DESC
@@ -213,7 +213,7 @@ def add_season_validate(library: sql.Connection, end: date, start: date,
     1. Check for SeasonGap/Missing/Order
     """
     if (not isinstance(end, date) and not isinstance(start, date) and
-       not isinstance(name, Tuple)):
+       not isinstance(name, tuple)):
         raise TypeError
     if end <= start:
         raise ValueError
