@@ -75,7 +75,7 @@ import os
 
 from spotipy import Spotify, SpotifyPKCE
 
-from constants import CACHE_PATH, CLIENT_ID, REDIRECT_URI, SCOPE
+from .constants import CACHE_PATH, CLIENT_ID, REDIRECT_URI, SCOPE
 
 
 def login() -> tuple[Spotify, dict]:

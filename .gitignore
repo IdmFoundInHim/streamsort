@@ -4,5 +4,5 @@ env/
 .cache-*
 APIkeys.json
 APIstate.json
-_notes*
-_exp*
+.notes*
+streamsort.egg-info/

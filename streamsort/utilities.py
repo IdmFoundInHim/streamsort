@@ -9,8 +9,8 @@ from itertools import cycle, islice
 import requests
 from spotipy import SpotifyPKCE
 
-from constants import MOBNAMES
-from musictypes import Mob
+from .constants import MOBNAMES
+from .musictypes import Mob
 
 def get_header(oauth: str) -> dict:
     """ Returns header with given oauth for the Spotify API """

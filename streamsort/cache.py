@@ -6,12 +6,9 @@ Copyright (c) 2020 IdmFoundInHim
 import json
 from datetime import datetime as dt
 
-from spotipy import Spotify
-try:
-    from spotipy import SpotifyPKCE
-except ImportError:
-    from spotipy import SpotifyImplicitGrant as SpotifyPKCE
-from utilities import results_generator
+from spotipy import Spotify, SpotifyPKCE
+
+from .utilities import results_generator
 
 
 def liked_songs_cache_check(api: Spotify) -> dict:

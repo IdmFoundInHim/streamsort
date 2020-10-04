@@ -1,2 +1,4 @@
-requests>=2.22.0
-spotipy~=2.15
+wheel
+pylint
+mypy
+-e .

@@ -7,12 +7,12 @@ from typing import Callable, Iterator, Optional, cast
 
 from spotipy import Spotify
 
-from cache import liked_songs_cache_check
-from constants import MOBNAMES, NUMSUGGESTIONS
-from errors import NoResultsException
-from interaction import confirm_action, notify_user
-from musictypes import Album, Artist, Mob, Playlist, Track, str_mob
-from utilities import results_generator, roundrobin
+from .cache import liked_songs_cache_check
+from .constants import MOBNAMES, NUMSUGGESTIONS
+from .errors import NoResultsException
+from .interaction import confirm_action, notify_user
+from .musictypes import Album, Artist, Mob, Playlist, Track, str_mob
+from .utilities import results_generator, roundrobin
 
 LIMIT = 50
 Subject = tuple[Spotify, dict]
