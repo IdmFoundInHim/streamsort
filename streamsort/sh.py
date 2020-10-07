@@ -71,22 +71,56 @@ Implementation:
     * In reserved mode, non-reserved tokens are new subshell names
 """
 
+from typing import NamedTuple
 import os
 from typing import Callable, Iterable, Iterator, NamedTuple, Union
 
 from spotipy import Spotify, SpotifyPKCE
 
 from .constants import CACHE_PATH, CLIENT_ID, REDIRECT_URI, SCOPE
+from .errors import UnexpectedResponseException
+from .musictypes import Mob
 from .sentences import ss_open
 
+SAFE = 0
+IDLE = 1
+WORK = 2
 
 class State(NamedTuple):
-    pass
+    api: Spotify
+    mob: Mob
+    subshells: dict = {}
+
+    def __str__(self):
+        mob = self['mob']
+        try:
+            return mob.get('name',
+                        mob.get('display_name',
+                                mob.get('id', mob['href'])))
+        except KeyError as err:
+            raise UnexpectedResponseException from err
+
+
+def shell() -> int:
+    status = IDLE
+    state = State(*login())
+    while (line := input(str(state) + '>')) != 'exit':
+        status = WORK
+        if line[:6] == 'logout':
+            if logout():
+                print('Logout failed')
+            else:
+                input('Press Enter to Login')
+        else:
+            state = process_line(state, iter(line.split()))
+        status = IDLE
+    status = SAFE
+    return status
 
 
 sentences = {'open': ss_open}
 Query = Union[str, dict]
-Sentence = Callable[State, Query, State]
+Sentence = Callable[[State, Query], State]
 
 def process_line(state: State,
                  tokens: Iterable[str]) -> tuple[Sentence, Query]:
@@ -172,11 +206,12 @@ def _process_line_nom(state: State, tokens: Iterable[str]) -> Query:
     return ' '.join(tokens)
 
 
-def _identity_state(state: State, query: Query):
+def _identity_state(state: State, query: Query) -> State:
     del query
     return state
 
-def login() -> tuple[Spotify, dict]:
+
+def login() -> tuple[Spotify, Mob]:
     """ Returns an authorized Spotify object and user details """
     spotify = Spotify(auth_manager=SpotifyPKCE(client_id=CLIENT_ID,
                                                redirect_uri=REDIRECT_URI,
