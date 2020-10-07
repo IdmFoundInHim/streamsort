@@ -72,11 +72,109 @@ Implementation:
 """
 
 import os
+from typing import Callable, Iterable, Iterator, NamedTuple, Union
 
 from spotipy import Spotify, SpotifyPKCE
 
 from .constants import CACHE_PATH, CLIENT_ID, REDIRECT_URI, SCOPE
+from .sentences import ss_open
 
+
+class State(NamedTuple):
+    pass
+
+
+sentences = {'open': ss_open}
+Query = Union[str, dict]
+Sentence = Callable[State, Query, State]
+
+def process_line(state: State,
+                 tokens: Iterable[str]) -> tuple[Sentence, Query]:
+    reserved_control = {
+        'in': _process_line_in,
+        'after': process_line,
+        'track': None,
+        'nom': None,
+        None: lambda a, b: (_identity_state, {})
+    }
+    branch_control = {
+        'in': "Parameter may not start with 'in'. Perhaps use 'nom in'",
+        'after': _process_line_after,
+        'track': _process_line_track,
+        'nom': _process_line_nom,
+        None: "Missing Parameter"
+    }
+
+    token = next(tokens, None)
+    if control := reserved_control.get(token):
+        try:
+            return control(state, tokens)
+        except TypeError as err:
+            raise ValueError(f"Lines starting with '{token}' "
+                              "do nothing") from err
+    if sentence := sentences.get(token):
+        token = next(tokens, None)
+        if control := branch_control.get(token):
+            try:
+                return (sentence, control(state, tokens))
+            except TypeError as err:
+                raise ValueError(control) from err
+        if substate := token.get(state['subshells']):
+            return (sentence, substate['mob'])
+        return (sentence, token + ' '.join(tokens))
+    return _process_line_init_subsh(state, tokens, token)
+
+
+def _process_line_init_subsh(state: State,
+                             tokens: Iterable[str],
+                             new_subshell: str) -> tuple[Sentence, Query]:
+    subject, query = process_line(state, tokens)
+    state['subshells'][new_subshell] = subject(state.copy(), query)
+    return (_identity_state, {})
+
+
+def _process_line_in(state: State,
+                     tokens: Iterable[str]) -> tuple[Sentence, Query]:
+    try:
+        subsh = next(tokens)
+    except StopIteration as err:
+        raise ValueError("Missing subshell name after 'in'") from err
+    try:
+        subject, query = process_line(state, tokens)
+        state['subshells'][subsh] = subject(state[2][subsh], query)
+        return (_identity_state, {})
+    except KeyError as err:
+        raise ValueError("Invalid subshell name after 'in'") from err
+
+
+def _process_line_track(state: State, tokens: Iterable[str]) -> Query:
+    track_num = next(tokens)
+    try:
+        return state['mob']['tracks']['items'][int(track_num)]
+    except (KeyError, ValueError):
+        track_nom = ' '.join(tokens)
+        if track_num != 'nom':
+            track_nom = f'{track_num} {track_nom}'
+        query = next((t for t in state['mob']['tracks']['items']
+                        if track_nom == t['name']), None)
+    if not query:
+        raise ValueError(f"Track {track_nom} was not found")
+    return query
+
+
+def _process_line_after(state: State, tokens: Iterable[str]) -> Query:
+    subject, query = process_line(state, tokens)
+    return subject(state, query)
+
+
+def _process_line_nom(state: State, tokens: Iterable[str]) -> Query:
+    del state
+    return ' '.join(tokens)
+
+
+def _identity_state(state: State, query: Query):
+    del query
+    return state
 
 def login() -> tuple[Spotify, dict]:
     """ Returns an authorized Spotify object and user details """
