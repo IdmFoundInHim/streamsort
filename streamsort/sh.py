@@ -71,67 +71,62 @@ Implementation:
     * In reserved mode, non-reserved tokens are new subshell names
 """
 
-from typing import NamedTuple
 import os
-from typing import Callable, Iterable, Iterator, NamedTuple, Union
+from typing import Callable, Iterable, Iterator, Optional, Union
 
 from spotipy import Spotify, SpotifyPKCE
 
 from .constants import CACHE_PATH, CLIENT_ID, REDIRECT_URI, SCOPE
-from .errors import UnexpectedResponseException
-from .musictypes import Mob
+from .errors import NoResultsError
+from .musictypes import Mob, State
 from .sentences import ss_open
 
 SAFE = 0
 IDLE = 1
 WORK = 2
 
-class State(NamedTuple):
-    api: Spotify
-    mob: Mob
-    subshells: dict = {}
-
-    def __str__(self):
-        mob = self['mob']
-        try:
-            return mob.get('name',
-                        mob.get('display_name',
-                                mob.get('id', mob['href'])))
-        except KeyError as err:
-            raise UnexpectedResponseException from err
-
 
 def shell() -> int:
     status = IDLE
     state = State(*login())
-    while (line := input(str(state) + '>')) != 'exit':
+    while (line := input(str(state) + ' > ')) != 'exit':
         status = WORK
         if line[:6] == 'logout':
             if logout():
                 print('Logout failed')
             else:
+                del state
                 input('Press Enter to Login')
+                state = State(*login())
         else:
-            state = process_line(state, iter(line.split()))
+            try:
+                sentence, query = process_line(state, iter(line.split()))
+                state = sentence(state, query)
+            except NoResultsError:
+                print('    No Results')
+            except ValueError as err:
+                print(f'    ERROR: {err.args[0]}')
         status = IDLE
     status = SAFE
     return status
 
 
 sentences = {'open': ss_open}
-Query = Union[str, dict]
+Query = Union[str, Mob]
 Sentence = Callable[[State, Query], State]
+Processor = Callable[[State, Iterator[str]], tuple[Sentence, Query]]
+QueryProcess = Callable[[State, Iterator[str]], Query]
 
 def process_line(state: State,
-                 tokens: Iterable[str]) -> tuple[Sentence, Query]:
-    reserved_control = {
+                 tokens: Iterator[str]) -> tuple[Sentence, Query]:
+    reserved_control: dict[Optional[str], Optional[Processor]] = {
         'in': _process_line_in,
         'after': process_line,
         'track': None,
         'nom': None,
-        None: lambda a, b: (_identity_state, {})
+        None: lambda a, b: (_identity_state, Mob({}))
     }
-    branch_control = {
+    branch_control: dict[Optional[str], Union[QueryProcess, str]] = {
         'in': "Parameter may not start with 'in'. Perhaps use 'nom in'",
         'after': _process_line_after,
         'track': _process_line_track,
@@ -153,18 +148,18 @@ def process_line(state: State,
                 return (sentence, control(state, tokens))
             except TypeError as err:
                 raise ValueError(control) from err
-        if substate := token.get(state['subshells']):
-            return (sentence, substate['mob'])
+        if substate := state.subshells.get(token):
+            return (sentence, substate.mob)
         return (sentence, token + ' '.join(tokens))
     return _process_line_init_subsh(state, tokens, token)
 
 
 def _process_line_init_subsh(state: State,
-                             tokens: Iterable[str],
+                             tokens: Iterator[str],
                              new_subshell: str) -> tuple[Sentence, Query]:
     subject, query = process_line(state, tokens)
-    state['subshells'][new_subshell] = subject(state.copy(), query)
-    return (_identity_state, {})
+    state.subshells[new_subshell] = subject(state, query)
+    return (_identity_state, Mob({}))
 
 
 def _process_line_in(state: State,
@@ -175,33 +170,34 @@ def _process_line_in(state: State,
         raise ValueError("Missing subshell name after 'in'") from err
     try:
         subject, query = process_line(state, tokens)
-        state['subshells'][subsh] = subject(state[2][subsh], query)
-        return (_identity_state, {})
+        state.subshells[subsh] = subject(state[2][subsh], query)
+        return (_identity_state, Mob({}))
     except KeyError as err:
         raise ValueError("Invalid subshell name after 'in'") from err
 
 
-def _process_line_track(state: State, tokens: Iterable[str]) -> Query:
+def _process_line_track(state: State, tokens: Iterator[str]) -> Mob:
     track_num = next(tokens)
     try:
-        return state['mob']['tracks']['items'][int(track_num)]
+        return state.mob['tracks']['items'][int(track_num) + 1]
     except (KeyError, ValueError):
         track_nom = ' '.join(tokens)
         if track_num != 'nom':
             track_nom = f'{track_num} {track_nom}'
-        query = next((t for t in state['mob']['tracks']['items']
+        breakpoint()
+        query = next((t for t in state.mob['tracks']['items']
                         if track_nom == t['name']), None)
     if not query:
         raise ValueError(f"Track {track_nom} was not found")
     return query
 
 
-def _process_line_after(state: State, tokens: Iterable[str]) -> Query:
+def _process_line_after(state: State, tokens: Iterator[str]) -> Mob:
     subject, query = process_line(state, tokens)
-    return subject(state, query)
+    return subject(state, query).mob
 
 
-def _process_line_nom(state: State, tokens: Iterable[str]) -> Query:
+def _process_line_nom(state: State, tokens: Iterator[str]) -> str:
     del state
     return ' '.join(tokens)
 
@@ -211,14 +207,14 @@ def _identity_state(state: State, query: Query) -> State:
     return state
 
 
-def login() -> tuple[Spotify, Mob]:
+def login() -> State:
     """ Returns an authorized Spotify object and user details """
     spotify = Spotify(auth_manager=SpotifyPKCE(client_id=CLIENT_ID,
                                                redirect_uri=REDIRECT_URI,
                                                cache_path=CACHE_PATH,
                                                scope=SCOPE))
     user = spotify.me()
-    return spotify, user
+    return State(spotify, user)
 
 
 def logout() -> int:

@@ -3,11 +3,11 @@
 Copyright (c) 2020 IdmFoundInHim, except where otherwise credited
 """
 
-from typing import Iterator
-from itertools import cycle, islice
+from typing import cast, Iterator, Mapping
 
+from more_itertools import flatten
 import requests
-from spotipy import SpotifyPKCE
+from spotipy import Spotify, SpotifyPKCE
 
 from .constants import MOBNAMES
 from .musictypes import Mob
@@ -21,7 +21,7 @@ def get_header(oauth: str) -> dict:
     }
 
 
-def results_generator(auth: SpotifyPKCE, page_zero: dict) -> Iterator[Mob]:
+def results_generator(auth: SpotifyPKCE, page_zero: Mapping) -> Iterator[Mob]:
     """ Cycles through multi-page responses from Spotify """
     if not all(k in page_zero for k in ['items', 'next']):
         raise ValueError
@@ -47,35 +47,77 @@ def results_generator(auth: SpotifyPKCE, page_zero: dict) -> Iterator[Mob]:
             yield from page['items']
 
 
-def roundrobin(*iterables):
-    "roundrobin('ABC', 'D', 'EF') --> A D E B F C"
-    # From the Python documentation on itertools
-    # https://docs.python.org/3/library/itertools.html#itertools-recipes
-    # Recipe credited to George Sakkis
-    num_active = len(iterables)
-    nexts = cycle(iter(it).__next__ for it in iterables)
-    while num_active:
-        try:
-            for next in nexts: # pylint: disable=redefined-builtin
-                yield next()
-        except StopIteration:
-            # Remove the iterator we just exhausted from the cycle.
-            num_active -= 1
-            nexts = cycle(islice(nexts, num_active))
+def _track_in_mob(api: Spotify, track: Mob, mob: Mob) -> bool:
+    if mob['type'] == 'artist':
+        return mob['id'] in (a['id'] for a in track['artists'])
+    if mob['type'] == 'album':
+        breakpoint()
+        return track['id'] in (t['id'] for t
+                               in results_generator(api.auth_manager,
+                                                    mob['tracks']))
+    if mob['type'] == 'playlist':
+        return (track['id']
+                in (t['id'] for t
+                    in results_generator(api.auth_manager,
+                                         cast(dict,
+                                              api.playlist_items(mob['id'])))))
+    return False
 
 
-def first_true(iterable, default=False, pred=None):
-    """Returns the first true value in the iterable.
+def _album_in_mob(api: Spotify, album: Mob, mob: Mob) -> bool:
+    if mob['type'] == 'artist':
+        return mob['id'] in (a['id'] for a in album['artists'])
+    if mob['type'] == 'playlist':
+        return (album['id'] in
+                (t['album']['id'] for t
+                 in results_generator(api.auth_manager,
+                                      cast(dict, api.playlist_items(mob['id']))
+                ))                    )
+    return False
 
-    If no true value is found, returns *default*
 
-    If *pred* is not None, returns the first item
-    for which pred(item) is true.
+def _artist_in_mob(api: Spotify, artist: Mob, mob: Mob) -> bool:
+    if mob['type'] == 'track':
+        return artist['id'] in (a['id'] for a in mob['artists'])
+    if mob['type'] == 'album':
+        return (artist['id'] in
+                flatten(t['artists'] for t
+                        in results_generator(api.auth_manager, mob['tracks'])))
+    if mob['type'] == 'playlist':
+        return (artist['id'] in
+                flatten(t['artists'] for t
+                        in results_generator(api.auth_manager,
+                                             cast(dict,
+                                                  api.playlist_items(mob['id'])
+                )       )                    )    )
+    return False
 
+
+_MOB_SPECIFIC_TESTS = {
+    'track': _track_in_mob,
+    'album': _album_in_mob,
+    'artist': _artist_in_mob,
+}
+
+
+def mob_in_mob(api: Spotify, obj: Mob, lst: Mob) -> bool:
+    """ Check if a mob is found in another mob
+    
+    All items contain themselves in addition to anything else.
+    Albums are considered to contain their tracks + any
+    artists credited on those tracks. Artists are considered to contain
+    any tracks they are credited on + any albums or playlists
+    containing their tracks. Playlists contain their tracks + any
+    albums and artists represented in those tracks.
+
+    TODO doctests here
+
+    Episodes and non-mobs match nothing, but throw no error.
+
+    TODO that especially needs doctesting
     """
-    # From the Python documentation on itertools
-    # https://docs.python.org/3/library/itertools.html#itertools-recipes
-
-    # first_true([a,b,c], x) --> a or b or c or x
-    # first_true([a,b], x, f) --> a if f(a) else b if f(b) else x
-    return next(filter(pred, iterable), default)
+    if obj['uri'] == lst['uri']:
+        return True
+    if test := _MOB_SPECIFIC_TESTS.get(obj['type']):
+        return test(api, obj, lst)
+    return False

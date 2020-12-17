@@ -1,22 +1,23 @@
-""" Wrappers for the Spotify API in format f(Subject, Param) -> Subject
+""" Wrappers for the Spotify API in format f(State, Param) -> State
 
 Copyright (c) 2020 IdmFoundInHim
 """
-import itertools as itools
-from typing import Callable, Iterator, Optional, cast
+from itertools import tee, zip_longest
+from typing import Callable, Iterator, Optional, Union, cast
 
-from spotipy import Spotify
+from more_itertools import roundrobin
 
 from .cache import liked_songs_cache_check
 from .constants import MOBNAMES, NUMSUGGESTIONS
-from .errors import NoResultsException
+from .errors import NoResultsError
 from .interaction import confirm_action, notify_user
-from .musictypes import Album, Artist, Mob, Playlist, Track, str_mob
-from .utilities import results_generator, roundrobin
+from .musictypes import (Album, Artist, Mob, Playlist, State, Track,
+                         str_mob)
+from .utilities import results_generator, mob_in_mob
 
 LIMIT = 50
-Subject = tuple[Spotify, dict]
-TypeSpecificSearch = Callable[[Subject, str], Optional[Mob]]
+Query = Union[str, Mob]
+TypeSpecificSearch = Callable[[State, str], Optional[Mob]]
 MultipleChoiceFunction = Callable[[Iterator[Mob]], Optional[Mob]]
 
 io_confirm = cast(Callable[[str], bool], confirm_action)
@@ -32,8 +33,11 @@ def io_inject(confirm: Optional[Callable[[str], bool]] = None,
     io_notify = notify or io_notify
 
 
-def ss_open(subject: Subject, query: str) -> Subject:
-    """ Search Spotify and return the selected item as a new subject
+def ss_open(subject: State, query: Query) -> State:
+    """  Return the specified item as a new subject
+
+    If query is a Mob, use that Mob. Otherwise, search Spotify to select
+    an item:
 
     The query is parsed for music object ("mob") tags: playlist, track,
     album, and artist. The first tag of that list that is found is set
@@ -59,12 +63,14 @@ def ss_open(subject: Subject, query: str) -> Subject:
 
     Playlist
 
+    0. In Current Subject
     1. Current User Owns
     2. Current User Follows
     3. All Others
 
     Tracks, Albums, Artists
 
+    0. In Current Subject
     1. Current User Follows artist
        (That is, an artist associated with the track/album)
     2. Current User's Liked Songs Contains
@@ -82,10 +88,15 @@ def ss_open(subject: Subject, query: str) -> Subject:
     to check with the user before finalizing the selection. Custom I/O
     functions may be supplied through `io_inject`.
     """
-    out = _ss_open_process_query(query)(subject, query)
+    try:
+        assert cast(Mob, query)['uri']
+        return State(subject.api, cast(Mob, query))
+    except (AssertionError, TypeError):
+        search_query = cast(str, query)
+    out = _ss_open_process_query(search_query)(subject, search_query)
     if out is None:
-        raise NoResultsException
-    return (subject[0], out)
+        raise NoResultsError
+    return State(subject.api, out, subject.subshells)
 
 
 def _ss_open_process_query(query: str) -> TypeSpecificSearch:
@@ -105,37 +116,38 @@ def _ss_open_process_query(query: str) -> TypeSpecificSearch:
     return _ss_open_general
 
 
-def _ss_open_general(subject: Subject, query: str) -> Optional[Mob]:
+def _ss_open_general(subject: State, query: str) -> Optional[Mob]:
     api = subject[0]
     results = api.search(query, LIMIT, type=','.join(MOBNAMES))
-    results = {x: _ss_open_familiar(api, results[x + 's'], x)
+    results = {x: _ss_open_familiar(subject, results[x + 's'], x)
                   if x != 'playlist'
-                  else _ss_open_playlist_familiar(api, results['playlists'])
+                  else _ss_open_playlist_familiar(subject,
+                                                  results['playlists'])
                for x in MOBNAMES}
-    for mobtypes in itools.cycle([[x for x in MOBNAMES if x != 'playlist'],
-                                  ['playlist']]):
-        result_gens = [_ss_open_genlen(next(results[t])) for t in mobtypes]
-        num_results = sum(tup[0] for tup in result_gens)
-        if num_results == 1:
-            return _ss_open_notifyuser(next([t[1]for t in result_gens
-                                             if t[0]][0]))
-        if num_results:
-            user_select = _ss_open_userinput(roundrobin(*[t[1] for t
-                                                          in result_gens]))
-            if user_select:
+    for result_gens in roundrobin(*[zip(*[results[t] for t in mobtypes])
+                                    for mobtypes
+                                    in [MOBNAMES[:-1], MOBNAMES[-1:]]]):
+        # Current result_gens: Iterable[Iterator[Iterator[Mob]]]
+        # Desired result_gens: Iterable[Iterator[Mob]]
+        # priority_results: Iterator[Mob]
+        priority_results, pr_original = tee(roundrobin(*result_gens))
+        if first_result := next(priority_results, None):
+            if next(priority_results, None):
+                return first_result
+            if user_select := _ss_open_userinput(pr_original):
                 return user_select
     return None
 
 
-def _ss_open_playlist(subject: Subject, query: str) -> Optional[Playlist]:
+def _ss_open_playlist(subject: State, query: str) -> Optional[Playlist]:
     api = subject[0]
     results = api.search(query, LIMIT, type='playlist')['playlists']
-    results = _ss_open_playlist_familiar(api, results)
+    results = _ss_open_playlist_familiar(subject, results)
     num_results, results_familiar = _ss_open_genlen(next(results))
     if num_results:
         return cast(Optional[Playlist],
                     _ss_open_notifyuser(next(results_familiar)))
-    results_f1, results_f2 = itools.tee(next(results))
+    results_f1, results_f2 = tee(next(results))
     first_result = next(results_f1, None)
     if first_result and all(z[0] == z[1] for z in zip(first_result['name'],
                                                       query)):
@@ -153,8 +165,12 @@ def _ss_open_playlist(subject: Subject, query: str) -> Optional[Playlist]:
     return None
 
 
-def _ss_open_playlist_familiar(api: Spotify,
+def _ss_open_playlist_familiar(subject: State,
                                results: dict) -> Iterator[Iterator[Playlist]]:
+    api = subject[0]
+    yield (cast(Playlist, p)
+           for p in results_generator(api.auth_manager, results)
+           if p['id'] == subject[1]['id'])
     usrid = api.me()['id']
     yield (cast(Playlist, p)
            for p in results_generator(api.auth_manager, results)
@@ -167,28 +183,31 @@ def _ss_open_playlist_familiar(api: Spotify,
 
 
 def _ss_open_track(variation: MultipleChoiceFunction) -> TypeSpecificSearch:
-    def get_track(subject: Subject, query: str) -> Optional[Track]:
+    def get_track(subject: State, query: str) -> Optional[Track]:
         api = subject[0]
         results = api.search(query, LIMIT, type='track')['tracks']
-        results = _ss_open_familiar(api, results, MOBNAMES[0])
-        for unconfidence, results in enumerate(results):
-            num_results, results = _ss_open_genlen(results)
+        results_tiered = _ss_open_familiar(subject, results, MOBNAMES[0])
+        for unconfidence, tier in enumerate(results_tiered):
+            num_results, results = _ss_open_genlen(tier)
+            breakpoint()
             if num_results == 1 and unconfidence < 3:
                 return cast(Track, next(results))
             if num_results:
                 user_select = variation(results,)
+                # UNREACHED breakpoint()
                 if user_select:
                     return cast(Track, user_select)
+        # REACHED breakpoint()
         return None
 
     return get_track
 
 
 def _ss_open_album(variation: MultipleChoiceFunction) -> TypeSpecificSearch:
-    def get_album(subject: Subject, query: str) -> Optional[Album]:
+    def get_album(subject: State, query: str) -> Optional[Album]:
         api = subject[0]
         results = api.search(query, LIMIT, type='album')['albums']
-        results = _ss_open_familiar(api, results, MOBNAMES[0])
+        results = _ss_open_familiar(subject, results, MOBNAMES[0])
         for unconfidence, results in enumerate(results):
             num_results, results = _ss_open_genlen(results)
             if num_results == 1 and unconfidence < 3:
@@ -203,10 +222,10 @@ def _ss_open_album(variation: MultipleChoiceFunction) -> TypeSpecificSearch:
 
 
 def _ss_open_artist(variation: MultipleChoiceFunction) -> TypeSpecificSearch:
-    def get_artist(subject: Subject, query: str) -> Optional[Artist]:
+    def get_artist(subject: State, query: str) -> Optional[Artist]:
         api = subject[0]
         results = api.search(query, LIMIT, type='artist')['artists']
-        results = _ss_open_familiar(api, results, MOBNAMES[0])
+        results = _ss_open_familiar(subject, results, MOBNAMES[0])
         for unconfidence, results in enumerate(results):
             if unconfidence == 2:
                 pass
@@ -223,7 +242,7 @@ def _ss_open_artist(variation: MultipleChoiceFunction) -> TypeSpecificSearch:
 
 
 def _ss_open_genlen(generator: Iterator) -> tuple[int, Iterator]:
-    scan_copy, return_copy = itools.tee(generator)
+    scan_copy, return_copy = tee(generator)
     one_result = next(scan_copy, None)
     if next(scan_copy, None) is not None:
         val = 2
@@ -233,13 +252,19 @@ def _ss_open_genlen(generator: Iterator) -> tuple[int, Iterator]:
     return val, return_copy
 
 
-def _ss_open_familiar(api: Spotify, results: dict,
+def _ss_open_familiar(subject: State, results: dict,
                       mobname: str) -> Iterator[Iterator[Mob]]:
+    api = subject[0]
     yield (r for r in results_generator(api.auth_manager, results)
-           if any(api.current_user_following_artists(a['id'] for a
-                                                     in r.get('artists', [r])))
-           )
+           if mob_in_mob(api, r, subject[1]))
+    yield (r for r in results_generator(api.auth_manager, results)
+           if any(cast(list,
+                       api.current_user_following_artists(a['id'] for a
+                                                          in r.get('artists',
+                                                                   [r])
+           )      )     )                                 )
     liked_songs = liked_songs_cache_check(api)
+    breakpoint()
     yield (r for r in results_generator(api.auth_manager, results)
            if r['id'] in liked_songs[mobname])
     yield (r for r in results_generator(api.auth_manager, results)

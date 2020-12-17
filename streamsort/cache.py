@@ -3,15 +3,16 @@
 Copyright (c) 2020 IdmFoundInHim
 """
 
-import json
 from datetime import datetime as dt
+import json
+from typing import Any, Mapping, cast
 
 from spotipy import Spotify, SpotifyPKCE
 
 from .utilities import results_generator
 
 
-def liked_songs_cache_check(api: Spotify) -> dict:
+def liked_songs_cache_check(api: Spotify) -> dict[str, Any]:
     """ Get a dict of the cached liked songs list, updating if needed
 
     All fields are calculated from saved *tracks*, so an album or artist
@@ -30,15 +31,15 @@ def liked_songs_cache_check(api: Spotify) -> dict:
             cached = json.load(cache)
     except FileNotFoundError:
         cached = {'as_of': '1970-01-01T00:00:00'}
-    latest: dict = api.current_user_saved_tracks()
+    latest = cast(dict, api.current_user_saved_tracks())
     if ((dt.now() - dt.fromisoformat(cached['as_of'])).days > 6
             or latest['total'] != cached['total']):
-        _liked_songs_cache_save(api.auth_manager, latest)
-        return latest
+        return _liked_songs_cache_save(api.auth_manager, latest)
     return cached
 
 
-def _liked_songs_cache_save(auth: SpotifyPKCE, page_zero: dict) -> None:
+def _liked_songs_cache_save(auth: SpotifyPKCE,
+                            page_zero: Mapping[str, Any]) -> dict[str, str]:
     pending = {}
     pending['total'] = page_zero['total']
     pending['as_of'] = dt.now().isoformat()
@@ -53,4 +54,5 @@ def _liked_songs_cache_save(auth: SpotifyPKCE, page_zero: dict) -> None:
     pending['album'] = list(albums)
     pending['artist'] = list(artists)
     with open(".cache/likedsongs.json", 'w') as cache:
-        return json.dump(pending, cache)
+        json.dump(pending, cache)
+    return pending

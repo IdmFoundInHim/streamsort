@@ -3,5 +3,8 @@
 Copyright (c) 2020 IdmFoundInHim
 """
 
-class NoResultsException(Exception):
+class NoResultsError(ValueError):
     """ A Spotify search returned no results """
+
+class UnexpectedResponseException(Exception):
+    """ Spotify returned an object with an unfamiliar format """

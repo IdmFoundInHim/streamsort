@@ -1,4 +1,5 @@
 wheel
-pylint
-mypy
 -e .
+-e git+https://github.com/python/mypy/#egg=mypy
+-e git+https://github.com/PyCQA/astroid#egg=astroid
+-e git+https://github.com/PyCQA/pylint/#egg=pylint

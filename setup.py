@@ -27,6 +27,7 @@ setuptools.setup(
     install_requires=[
         'requests>=2.22.0',
         'spotipy~=2.15',
+        'more-itertools>=8.0.0'
     ],
     package_data={
         'streamsort': ['README.md']
