@@ -135,12 +135,13 @@ def process_line(state: State,
     }
 
     token = next(tokens, None)
-    if control := reserved_control.get(token):
-        try:
-            return control(state, tokens)
-        except TypeError as err:
-            raise ValueError(f"Lines starting with '{token}' "
-                              "do nothing") from err
+    try:
+        return reserved_control[token](state, tokens)
+    except TypeError as err:
+        raise ValueError(f"Lines starting with '{token}' "
+                          "do nothing") from err
+    except KeyError:
+        pass        
     if sentence := sentences.get(token):
         token = next(tokens, None)
         if control := branch_control.get(token):
