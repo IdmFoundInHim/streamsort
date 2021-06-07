@@ -3,6 +3,7 @@
 Copyright (c) 2020 IdmFoundInHim
 """
 
+from __future__ import annotations
 from typing import NamedTuple, NewType
 
 from spotipy import Spotify
@@ -34,7 +35,7 @@ def str_mob(mob: Mob):
 class State(NamedTuple):
     api: Spotify
     mob: Mob
-    subshells: dict = {}
+    subshells: dict[str, State] = {}
 
     def __str__(self):
         mob = self.mob
