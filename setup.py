@@ -14,7 +14,7 @@ setuptools.setup(
     url='https://github.com/IdmFoundInHim/streamsort',
     packages=setuptools.find_packages(),
     classifiers=[
-        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
         'License :: OSI Approved :: MIT License',
         'Operating System :: OS Independent',
         'Development Status :: 2 - Pre-Alpha',
@@ -23,7 +23,7 @@ setuptools.setup(
         'Typing :: Typed'
     ],
     keywords='playlists music backup shuffle',
-    python_requires='>=3.9',
+    python_requires='>=3.10',
     install_requires=[
         'requests>=2.22.0',
         'spotipy~=2.15',

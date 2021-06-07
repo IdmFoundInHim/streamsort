@@ -8,12 +8,12 @@ from typing import Callable, Iterator, Optional, Union, cast
 from more_itertools import roundrobin
 
 from .cache import liked_songs_cache_check
-from .constants import MOBNAMES, NUMSUGGESTIONS
+from .constants import MOBNAMES, MOB_GET_FUNCTIONS, NUMSUGGESTIONS
 from .errors import NoResultsError
 from .interaction import confirm_action, notify_user
 from .musictypes import (Album, Artist, Mob, Playlist, State, Track,
                          str_mob)
-from .utilities import results_generator, mob_in_mob
+from .utilities import results_generator, mob_in_mob, contains_uri
 
 LIMIT = 50
 Query = Union[str, Mob]
@@ -100,6 +100,8 @@ def ss_open(subject: State, query: Query) -> State:
 
 
 def _ss_open_process_query(query: str) -> TypeSpecificSearch:
+    if contains_uri(query):
+        return _ss_open_uri
     tags = {t: (t + ':' in query) for t in MOBNAMES}
     if tags['playlist']:
         return _ss_open_playlist
@@ -114,6 +116,15 @@ def _ss_open_process_query(query: str) -> TypeSpecificSearch:
     if tags['artist']:
         return _ss_open_artist(variation=_ss_open_firstresult)
     return _ss_open_general
+
+
+def _ss_open_uri(subject: State, query: str) -> Optional[Mob]:
+    api = subject[0]
+    _, mobtype, mobid = contains_uri(query).split(':')
+    try:
+        return MOB_GET_FUNCTIONS[mobtype](api, mobid)
+    except KeyError:
+        return None
 
 
 def _ss_open_general(subject: State, query: str) -> Optional[Mob]:
@@ -264,7 +275,6 @@ def _ss_open_familiar(subject: State, results: dict,
                                                                    [r])
            )      )     )                                 )
     liked_songs = liked_songs_cache_check(api)
-    breakpoint()
     yield (r for r in results_generator(api.auth_manager, results)
            if r['id'] in liked_songs[mobname])
     yield (r for r in results_generator(api.auth_manager, results)

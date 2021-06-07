@@ -32,7 +32,7 @@ Control Syntax:
         function as the parameter. Without function, after is
         superfluous.
     Subject Reference `> {function-Optional} track {Number}`
-        Gets the Number-th track of the open mob, passing it to unction
+        Gets the Number-th track of the open mob, passing it to function
         or returning it
     Escape `{function} nom Parameter Starting With Reserved Token`
         Drops interpreter into free mode from branch mode

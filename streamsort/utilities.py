@@ -4,12 +4,14 @@ Copyright (c) 2020 IdmFoundInHim, except where otherwise credited
 """
 
 from typing import cast, Iterator, Mapping
+import urllib
 
 from more_itertools import flatten
 import requests
 from spotipy import Spotify, SpotifyPKCE
 
-from .constants import MOBNAMES
+from .constants import (MOBNAMES, MOB_URI_PREFIX, MOB_URL_PREFIX,
+                        SPID_VALID_CHARS)
 from .musictypes import Mob
 
 def get_header(oauth: str) -> dict:
@@ -45,6 +47,23 @@ def results_generator(auth: SpotifyPKCE, page_zero: Mapping) -> Iterator[Mob]:
             key = next((n + 's' for n in MOBNAMES if n + 's' in page), 'items')
             page = page[key]
             yield from page['items']
+
+
+def contains_uri(uri: str):
+    """ Returns the URI in standard format only if present """
+    if uri.startswith(MOB_URL_PREFIX):
+        try:
+            url = urllib.parse.urlparse(uri)
+        except ValueError:
+            return ''
+        uri = MOB_URI_PREFIX + ':'.join(url.path.split('/')[-2:])
+    uri_parts = uri.strip().split(':')
+    if (len(uri_parts) == 3
+       and uri_parts[0] == 'spotify'
+       and uri_parts[1] in MOBNAMES
+       and all(c in SPID_VALID_CHARS for c in uri_parts[2])):
+        return uri
+    return ''
 
 
 def _track_in_mob(api: Spotify, track: Mob, mob: Mob) -> bool:
