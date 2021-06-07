@@ -183,12 +183,11 @@ def _process_line_in(state: State,
 def _process_line_track(state: State, tokens: Iterator[str]) -> Mob:
     track_num = next(tokens)
     try:
-        return state.mob['tracks']['items'][int(track_num) + 1]
+        return state.mob['tracks']['items'][int(track_num) - 1]
     except (KeyError, ValueError):
         track_nom = ' '.join(tokens)
         if track_num != 'nom':
             track_nom = f'{track_num} {track_nom}'
-        breakpoint()
         query = next((t for t in state.mob['tracks']['items']
                         if track_nom == t['name']), None)
     if not query:
