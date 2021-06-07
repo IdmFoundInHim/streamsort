@@ -27,13 +27,13 @@ Control Syntax:
         (Yes, `subsh subsub trisub` is valid)
     Subshell Extension `> in subshell-name {Line}`
     Subshell Loading `> subshell-name`
-    Pipeline `> {function-Optional} after {Line}`
+    Pipeline `> {function} after {Line}`
         This will pass the output (resulting subject) of Line to
-        function as the parameter. Without function, after is
-        superfluous.
+        function as the parameter.
     Subject Reference `> {function-Optional} track {Number}`
         Gets the Number-th track of the open mob, passing it to function
-        or returning it
+        or loading it. Rather than Number, the full Track name can also
+        be specified, case-insensitive
     Escape `{function} nom Parameter Starting With Reserved Token`
         Drops interpreter into free mode from branch mode
         (Yes, `open nom nom` is valid)
@@ -192,7 +192,7 @@ def _process_line_track(state: State, tokens: Iterator[str]) -> Mob:
         if track_num != 'nom':
             track_nom = f'{track_num} {track_nom}'
         query = next((t for t in state.mob['tracks']['items']
-                        if track_nom == t['name']), None)
+                        if track_nom.lower() == t['name'].lower()), None)
     if not query:
         raise ValueError(f"Track {track_nom} was not found")
     return query
