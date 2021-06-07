@@ -122,7 +122,7 @@ def process_line(state: State,
     reserved_control: dict[Optional[str], Optional[Processor]] = {
         'in': _process_line_in,
         'after': process_line,
-        'track': None,
+        'track': _process_line_track_load,
         'nom': None,
         None: lambda a, b: (_identity_state, Mob({}))
     }
@@ -198,6 +198,13 @@ def _process_line_track(state: State, tokens: Iterator[str]) -> Mob:
     if not query:
         raise ValueError(f"Track {track_nom} was not found")
     return query
+
+
+def _process_line_track_load(state: State,
+                             tokens: Iterable[str]) -> tuple[Sentence, Query]:
+    mob = _process_line_track(state, tokens)
+    new_state = State(state[0], mob, state[2])
+    return ((lambda a, b: new_state), '')
 
 
 def _process_line_after(state: State, tokens: Iterator[str]) -> Mob:
