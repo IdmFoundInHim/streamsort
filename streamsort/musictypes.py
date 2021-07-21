@@ -39,10 +39,7 @@ class State(NamedTuple):
 
     def __str__(self):
         mob = self.mob
-        try:
-            assert isinstance(mob, dict)
-        except AssertionError:
-            breakpoint()
+        assert isinstance(mob, dict)
         try:
             return mob.get('name',
                         mob.get('display_name',

@@ -78,7 +78,7 @@ from spotipy import Spotify, SpotifyPKCE
 
 from .constants import CACHE_PATH, CLIENT_ID, REDIRECT_URI, SCOPE
 from .errors import NoResultsError
-from .musictypes import Mob, State
+from .musictypes import Mob, State, str_mob
 from .sentences import ss_open
 
 SAFE = 0
@@ -89,7 +89,7 @@ WORK = 2
 def shell() -> int:
     status = IDLE
     state = State(*login())
-    while (line := input(str(state) + ' > ')) != 'exit':
+    while (line := input(str_mob(state.mob) + ' > ')) != 'exit':
         status = WORK
         if line[:6] == 'logout':
             if logout():
