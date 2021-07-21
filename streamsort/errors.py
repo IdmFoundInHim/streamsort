@@ -6,5 +6,19 @@ Copyright (c) 2020 IdmFoundInHim
 class NoResultsError(ValueError):
     """ A Spotify search returned no results """
 
+class UnsupportedVerbError(ValueError):
+    """ The Subject did not allow the attempted Sentence """
+
+    def __init__(self, subject, verb):
+        self.args = (f'{subject} does not allow you to use "{verb}"',
+                     *self.args)
+
+class UnsupportedQueryError(ValueError):
+    """ A Sentence was attempted with a disallowed (but understood) Query """
+
+    def __init__(self, verb, query):
+        self.args = (f'"{verb}" is unable to process {query}',
+                     *self.args)
+
 class UnexpectedResponseException(Exception):
     """ Spotify returned an object with an unfamiliar format """

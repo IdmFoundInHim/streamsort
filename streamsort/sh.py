@@ -74,12 +74,12 @@ Implementation:
 import os
 from typing import Callable, Iterable, Iterator, Optional, Union
 
-from spotipy import Spotify, SpotifyPKCE
+from spotipy import Spotify, SpotifyException, SpotifyPKCE
 
 from .constants import CACHE_PATH, CLIENT_ID, REDIRECT_URI, SCOPE
 from .errors import NoResultsError
 from .musictypes import Mob, State, str_mob
-from .sentences import ss_open
+from .sentences import ss_add, ss_open, ss_remove
 
 SAFE = 0
 IDLE = 1
@@ -104,6 +104,8 @@ def shell() -> int:
                 state = sentence(state, query)
             except NoResultsError:
                 print('    No Results')
+            except SpotifyException:
+                print('    ERROR: The Spotify operation failed')
             except ValueError as err:
                 print(f'    ERROR: {err.args[0]}')
         status = IDLE
@@ -111,7 +113,7 @@ def shell() -> int:
     return status
 
 
-sentences = {'open': ss_open}
+sentences = {'open': ss_open, 'add': ss_add, 'remove': ss_remove}
 Query = Union[str, Mob]
 Sentence = Callable[[State, Query], State]
 Processor = Callable[[State, Iterator[str]], tuple[Sentence, Query]]

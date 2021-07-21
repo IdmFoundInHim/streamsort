@@ -3,17 +3,17 @@
 Copyright (c) 2020 IdmFoundInHim
 """
 from itertools import tee, zip_longest
-from typing import Callable, Iterator, Optional, Union, cast
+from typing import Any, Callable, Iterator, Optional, Union, cast
 
 from more_itertools import roundrobin
+from spotipy import Spotify, SpotifyPKCE
 
 from .cache import liked_songs_cache_check
-from .constants import MOBNAMES, MOB_GET_FUNCTIONS, NUMSUGGESTIONS
-from .errors import NoResultsError
+from .constants import MOB_GET_FUNCTIONS, MOBNAMES, NUMSUGGESTIONS
+from .errors import NoResultsError, UnsupportedQueryError, UnsupportedVerbError
 from .interaction import confirm_action, notify_user
-from .musictypes import (Album, Artist, Mob, Playlist, State, Track,
-                         str_mob)
-from .utilities import results_generator, mob_in_mob, contains_uri
+from .musictypes import Album, Artist, Mob, Playlist, State, Track, str_mob
+from .utilities import contains_uri, mob_in_mob, results_generator
 
 LIMIT = 50
 Query = Union[str, Mob]
@@ -97,6 +97,30 @@ def ss_open(subject: State, query: Query) -> State:
     if out is None:
         raise NoResultsError
     return State(subject.api, out, subject.subshells)
+
+
+def ss_add(subject: State, query: Query) -> State:
+    if subject.mob['type'] != 'playlist':
+        raise UnsupportedVerbError(str(subject.mob), 'add')
+    try:
+        _ss_add_mob(subject.api, subject.mob, cast(Mob, query))
+    except TypeError:
+        simulated_state = State(subject.api, subject.mob, {})
+        _ss_add_mob(subject.api, subject.mob,
+                    ss_open(simulated_state, query).mob)
+    return subject
+
+
+def ss_remove(subject: State, query: Query) -> State:
+    if subject.mob['type'] != 'playlist':
+        raise UnsupportedVerbError(str(subject.mob), 'remove')
+    try:
+        _ss_remove_mob(subject.api, subject.mob, cast(Mob, query))
+    except TypeError:
+        simulated_state = State(subject.api, subject.mob, {})
+        _ss_remove_mob(subject.api, subject.mob,
+                    ss_open(simulated_state, query).mob)
+    return subject
 
 
 def _ss_open_process_query(query: str) -> TypeSpecificSearch:
@@ -200,7 +224,6 @@ def _ss_open_track(variation: MultipleChoiceFunction) -> TypeSpecificSearch:
         results_tiered = _ss_open_familiar(subject, results, MOBNAMES[0])
         for unconfidence, tier in enumerate(results_tiered):
             num_results, results = _ss_open_genlen(tier)
-            breakpoint()
             if num_results == 1 and unconfidence < 3:
                 return cast(Track, next(results))
             if num_results:
@@ -303,6 +326,34 @@ def _ss_open_notifyuser(selection: Optional[Mob] = None) -> Optional[Mob]:
         return selection
     io_notify("Seach returned no results")
     return None
+
+
+def _playlist_operation(operation: Callable[[str, list[str]], Any],
+                        auth: SpotifyPKCE,
+                        destination: Mob,
+                        target: Mob):
+    if tracks := target.get('tracks', target.get('episodes')):
+        target_tracks = results_generator(auth, tracks)
+    else:
+        target_tracks = [target]
+    if target['type'] == 'playlist':
+        target_tracks = [t['track'] for t in target_tracks]
+    operation(destination['id'],
+              [t['id'] for t in target_tracks])
+
+
+def _ss_add_mob(api: Spotify, destination: Mob, target: Mob):
+    if target['type'] == 'artist':
+        raise UnsupportedQueryError('add', mob)
+    _playlist_operation(api.playlist_add_items, api.auth_manager,
+                        destination, target)
+
+
+def _ss_remove_mob(api: Spotify, destination: Mob, target: Mob):
+    if target['type'] == 'artist':
+        raise UnsupportedQueryError('remove', None)
+    _playlist_operation(api.playlist_remove_all_occurrences_of_items,
+                        api.auth_manager, destination, target)
 
 
 if __name__ == "__main__":
