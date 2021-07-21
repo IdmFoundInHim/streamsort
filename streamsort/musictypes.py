@@ -8,6 +8,8 @@ from typing import NamedTuple, NewType
 
 from spotipy import Spotify
 
+from .errors import UnexpectedResponseException
+
 Mob = NewType('Mob', dict)
 Track = NewType('Track', Mob)
 Album = NewType('Album', Mob)
@@ -19,16 +21,21 @@ _MOB_STRS = {
     'track': '"{}" by {}{}',
     'album': '*{}* by {}, {} songs',
     'artist': '{}{}{}',
-    'playlist': '{}, {}{} songs'
+    'playlist': '{}, {}{} songs',
+    'episode': '"{}" from *{}{}*',
+    'show': '*{}* from {}{}'
 }
 
 
 def str_mob(mob: Mob):
     """ Constructs display string of given Mob (dict) """
     mob_fields = [mob['name'],
-                  mob.get('artists', [{'name': ''}])[0]['name'],
+                  mob['artists'][0]['name'] if mob.get('artists')
+                    else mob.get('show', mob.get('publisher')),
                   mob.get('total_tracks')
-                  or mob.get('tracks', {'total': ''})['total']]
+                    or mob['tracks']['total'] if mob.get('tracks')
+                    else mob['episodes']['total'] if mob.get('episodes')
+                    else '']
     return _MOB_STRS[mob['type']].format(*mob_fields)
 
 
