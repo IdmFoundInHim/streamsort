@@ -9,14 +9,14 @@ class NoResultsError(ValueError):
 class UnsupportedVerbError(ValueError):
     """ The Subject did not allow the attempted Sentence """
 
-    def __init__(self, subject, verb):
+    def __init__(self, subject: str, verb: str):
         self.args = (f'{subject} does not allow you to use "{verb}"',
                      *self.args)
 
 class UnsupportedQueryError(ValueError):
     """ A Sentence was attempted with a disallowed (but understood) Query """
 
-    def __init__(self, verb, query):
+    def __init__(self, verb: str, query: str):
         self.args = (f'"{verb}" is unable to process {query}',
                      *self.args)
 

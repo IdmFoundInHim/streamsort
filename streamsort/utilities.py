@@ -140,3 +140,13 @@ def mob_in_mob(api: Spotify, obj: Mob, lst: Mob) -> bool:
     if test := _MOB_SPECIFIC_TESTS.get(obj['type']):
         return test(api, obj, lst)
     return False
+
+
+def iter_mob(auth: SpotifyPKCE, mob: Mob) -> Iterator[str]:
+    if tracks := mob.get('tracks', mob.get('episodes')):
+        mob_tracks = results_generator(auth, tracks)
+    else:
+        mob_tracks = [mob]
+    if mob['type'] == 'playlist':
+        mob_tracks = (t['track'] for t in mob_tracks)
+    yield from (t['id'] for t in mob_tracks)

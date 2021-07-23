@@ -13,7 +13,7 @@ from .constants import MOB_GET_FUNCTIONS, MOBNAMES, NUMSUGGESTIONS
 from .errors import NoResultsError, UnsupportedQueryError, UnsupportedVerbError
 from .interaction import confirm_action, notify_user
 from .musictypes import Album, Artist, Mob, Playlist, State, Track, str_mob
-from .utilities import contains_uri, mob_in_mob, results_generator
+from .utilities import iter_mob, contains_uri, mob_in_mob, results_generator
 
 LIMIT = 50
 Query = Union[str, Mob]
@@ -101,26 +101,26 @@ def ss_open(subject: State, query: Query) -> State:
 
 def ss_add(subject: State, query: Query) -> State:
     if subject.mob['type'] != 'playlist':
-        raise UnsupportedVerbError(str(subject.mob), 'add')
+        raise UnsupportedVerbError(str_mob(subject.mob), 'add')
     try:
         _ss_add_mob(subject.api, subject.mob, cast(Mob, query))
     except TypeError:
         simulated_state = State(subject.api, subject.mob, {})
         _ss_add_mob(subject.api, subject.mob,
                     ss_open(simulated_state, query).mob)
-    return subject
+    return ss_open(subject, subject.mob['uri'])
 
 
 def ss_remove(subject: State, query: Query) -> State:
     if subject.mob['type'] != 'playlist':
-        raise UnsupportedVerbError(str(subject.mob), 'remove')
+        raise UnsupportedVerbError(str_mob(subject.mob), 'remove')
     try:
         _ss_remove_mob(subject.api, subject.mob, cast(Mob, query))
     except TypeError:
         simulated_state = State(subject.api, subject.mob, {})
         _ss_remove_mob(subject.api, subject.mob,
                     ss_open(simulated_state, query).mob)
-    return subject
+    return ss_open(subject, subject.mob['uri'])
 
 
 def _ss_open_process_query(query: str) -> TypeSpecificSearch:
@@ -328,32 +328,19 @@ def _ss_open_notifyuser(selection: Optional[Mob] = None) -> Optional[Mob]:
     return None
 
 
-def _playlist_operation(operation: Callable[[str, list[str]], Any],
-                        auth: SpotifyPKCE,
-                        destination: Mob,
-                        target: Mob):
-    if tracks := target.get('tracks', target.get('episodes')):
-        target_tracks = results_generator(auth, tracks)
-    else:
-        target_tracks = [target]
-    if target['type'] == 'playlist':
-        target_tracks = [t['track'] for t in target_tracks]
-    operation(destination['id'],
-              [t['id'] for t in target_tracks])
-
-
 def _ss_add_mob(api: Spotify, destination: Mob, target: Mob):
     if target['type'] == 'artist':
-        raise UnsupportedQueryError('add', mob)
-    _playlist_operation(api.playlist_add_items, api.auth_manager,
-                        destination, target)
+        raise UnsupportedQueryError('add', str_mob(target))
+    api.playlist_add_items(destination['id'],
+                           iter_mob(api.auth_manager, target))
 
 
 def _ss_remove_mob(api: Spotify, destination: Mob, target: Mob):
     if target['type'] == 'artist':
-        raise UnsupportedQueryError('remove', None)
-    _playlist_operation(api.playlist_remove_all_occurrences_of_items,
-                        api.auth_manager, destination, target)
+        raise UnsupportedQueryError('remove', str_mob(target))
+    api.playlist_remove_all_occurrences_of_items(destination['id'],
+                                                 iter_mob(api.auth_manager,
+                                                           target))
 
 
 if __name__ == "__main__":

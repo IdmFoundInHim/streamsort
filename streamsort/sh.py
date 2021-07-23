@@ -72,7 +72,7 @@ Implementation:
 """
 
 import os
-from typing import Callable, Iterable, Iterator, Optional, Union
+from typing import Callable, Iterable, Iterator, Optional, Union, cast
 
 from spotipy import Spotify, SpotifyException, SpotifyPKCE
 
@@ -88,7 +88,7 @@ WORK = 2
 
 def shell() -> int:
     status = IDLE
-    state = State(*login())
+    state = login()
     while (line := input(str_mob(state.mob) + ' > ')) != 'exit':
         status = WORK
         if line[:6] == 'logout':
@@ -97,7 +97,7 @@ def shell() -> int:
             else:
                 del state
                 input('Press Enter to Login')
-                state = State(*login())
+                state = login()
         else:
             try:
                 sentence, query = process_line(state, iter(line.split()))
@@ -228,7 +228,7 @@ def login() -> State:
                                                redirect_uri=REDIRECT_URI,
                                                cache_path=CACHE_PATH,
                                                scope=SCOPE))
-    user = spotify.me()
+    user = cast(Mob, spotify.me())
     return State(spotify, user)
 
 

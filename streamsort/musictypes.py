@@ -23,15 +23,16 @@ _MOB_STRS = {
     'artist': '{}{}{}',
     'playlist': '{}, {}{} songs',
     'episode': '"{}" from *{}{}*',
-    'show': '*{}* from {}{}'
+    'show': '*{}* from {}{}',
+    'user': '@{}{}{}'
 }
 
 
 def str_mob(mob: Mob):
     """ Constructs display string of given Mob (dict) """
-    mob_fields = [mob['name'],
+    mob_fields = [mob.get('name', mob.get('display_name')),
                   mob['artists'][0]['name'] if mob.get('artists')
-                    else mob.get('show', mob.get('publisher')),
+                    else mob.get('show', mob.get('publisher', '')),
                   mob.get('total_tracks')
                     or mob['tracks']['total'] if mob.get('tracks')
                     else mob['episodes']['total'] if mob.get('episodes')
