@@ -70,10 +70,9 @@ def _track_in_mob(api: Spotify, track: Mob, mob: Mob) -> bool:
     if mob['type'] == 'artist':
         return mob['id'] in (a['id'] for a in track['artists'])
     if mob['type'] == 'album':
-        breakpoint()
         return track['id'] in (t['id'] for t
                                in results_generator(api.auth_manager,
-                                                    mob['tracks']))
+                                                    api.album_tracks(mob['id'])))
     if mob['type'] == 'playlist':
         return (track['id']
                 in (t['id'] for t
@@ -101,7 +100,8 @@ def _artist_in_mob(api: Spotify, artist: Mob, mob: Mob) -> bool:
     if mob['type'] == 'album':
         return (artist['id'] in
                 flatten(t['artists'] for t
-                        in results_generator(api.auth_manager, mob['tracks'])))
+                        in results_generator(api.auth_manager,
+                                             api.album_tracks(mob['id']))))
     if mob['type'] == 'playlist':
         return (artist['id'] in
                 flatten(t['artists'] for t
