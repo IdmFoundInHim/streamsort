@@ -151,7 +151,7 @@ def process_line(state: State,
                 return (sentence, control(state, tokens))
             except TypeError as err:
                 raise ValueError(control) from err
-        return (sentence, token + ' '.join(tokens))
+        return (sentence, token + ' ' + ' '.join(tokens))
     if substate := state.subshells.get(token):
         subsh_name, token = token, next(tokens, None)
         if token:
