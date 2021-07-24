@@ -1,6 +1,6 @@
 """ Special exceptions for StreamSort
 
-Copyright (c) 2020 IdmFoundInHim
+Copyright (c) 2021 IdmFoundInHim, under MIT License
 """
 
 class NoResultsError(ValueError):
@@ -10,6 +10,7 @@ class UnsupportedVerbError(ValueError):
     """ The Subject did not allow the attempted Sentence """
 
     def __init__(self, subject: str, verb: str):
+        super().__init__()
         self.args = (f'{subject} does not allow you to use "{verb}"',
                      *self.args)
 
@@ -17,6 +18,7 @@ class UnsupportedQueryError(ValueError):
     """ A Sentence was attempted with a disallowed (but understood) Query """
 
     def __init__(self, verb: str, query: str):
+        super().__init__()
         self.args = (f'"{verb}" is unable to process {query}',
                      *self.args)
 

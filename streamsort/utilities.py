@@ -3,8 +3,8 @@
 Copyright (c) 2020 IdmFoundInHim, except where otherwise credited
 """
 
-from typing import cast, Iterator, Mapping
-import urllib
+from typing import Iterator, Mapping
+from urllib import parse as urlparse
 
 from more_itertools import flatten
 import requests
@@ -53,7 +53,7 @@ def as_uri(uri: str):
     """ Returns the URI in standard format only if present """
     if uri.startswith(MOB_URL_PREFIX):
         try:
-            url = urllib.parse.urlparse(uri)
+            url = urlparse.urlparse(uri)
         except ValueError:
             return ''
         uri = MOB_URI_PREFIX + ':'.join(url.path.split('/')[-2:])
@@ -131,7 +131,7 @@ _MOB_SPECIFIC_TESTS = {
 
 def mob_in_mob(api: Spotify, obj: Mob, lst: Mob) -> bool:
     """ Check if a mob is found in another mob
-    
+
     All items contain themselves in addition to anything else.
     Albums are considered to contain their tracks + any
     artists credited on those tracks. Artists are considered to contain

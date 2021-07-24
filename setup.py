@@ -24,10 +24,11 @@ setuptools.setup(
     ],
     keywords='playlists music backup shuffle',
     python_requires='>=3.10',
-    install_requires=[
-        'requests>=2.22.0',
-        'spotipy~=2.15',
-        'more-itertools>=8.0.0'
+    install_requires=[  # Licenses
+        'requests>=2.22.0',  # Apache
+        'spotipy~=2.15',  # MIT
+        'more-itertools>=8.0.0',  # MIT
+        'frozendict>=2.0.0'  # LGPL
     ],
     package_data={
         'streamsort': ['README.md']

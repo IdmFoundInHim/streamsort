@@ -1,11 +1,12 @@
 """ Setup for static type checking and non-trivial casting functions
 
-Copyright (c) 2020 IdmFoundInHim
+Copyright (c) 2021 IdmFoundInHim, under MIT License
 """
 
 from __future__ import annotations
 from typing import NamedTuple, NewType
 
+from frozendict import frozendict
 from spotipy import Spotify
 
 from .errors import UnexpectedResponseException
@@ -43,7 +44,7 @@ def str_mob(mob: Mob):
 class State(NamedTuple):
     api: Spotify
     mob: Mob
-    subshells: dict[str, State] = {}
+    subshells: frozendict[str, State] = frozendict()
 
     def __str__(self):
         mob = self.mob

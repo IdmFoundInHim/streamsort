@@ -1,3 +1,9 @@
+""" CLI Initializer for StreamSort
+
+Copyright (c) 2021 IdmFoundInHim, under MIT License
+
+Usage: python3 -m streamsort
+"""
 import os
 import sys
 

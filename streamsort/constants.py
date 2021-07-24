@@ -1,3 +1,7 @@
+""" Package-level Constants for StreamSort
+
+Copyright (c) 2021 IdmFoundInHim, under MIT License
+"""
 import os
 import string
 

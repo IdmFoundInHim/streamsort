@@ -1,9 +1,9 @@
 """ Wrappers for the Spotify API in format f(State, Param) -> State
 
-Copyright (c) 2020 IdmFoundInHim
+Copyright (c) 2021 IdmFoundInHim, under MIT License
 """
-from itertools import tee, zip_longest
-from typing import Any, Callable, Iterator, Optional, Union, cast
+from itertools import tee
+from typing import Callable, Iterator, Optional, Union, cast
 
 from more_itertools import roundrobin
 from spotipy import Spotify, SpotifyPKCE
@@ -140,9 +140,18 @@ def ss_play(subject: State, query: Query) -> State:
             and mob_in_mob(subject.api, to_play, subject.mob)):
         _ss_play_in_context(subject.api, subject.mob, to_play)
     else:
-        subject.api.start_playback(uris=list(iter_mob(subject.api.auth_manager,
-                                                      to_play)))
+        uri_list = list(iter_mob(cast(SpotifyPKCE, subject.api.auth_manager),
+                                 to_play))
+        subject.api.start_playback(uris=uri_list)
     return subject
+
+
+def ss_all(subject: State, query: Query) -> State:
+    return ss_open(subject, query)
+
+
+def ss_new(subject: State, query: Query) -> State:
+    return ss_open(subject, query)
 
 
 def _ss_open_process_query(query: str) -> TypeSpecificSearch:
@@ -175,7 +184,7 @@ def _ss_open_uri(subject: State, query: str) -> Optional[Mob]:
 
 def _ss_open_general(subject: State, query: str) -> Optional[Mob]:
     api = subject[0]
-    results = api.search(query, LIMIT, type=','.join(MOBNAMES))
+    results = cast(dict, api.search(query, LIMIT, type=','.join(MOBNAMES)))
     results = {x: _ss_open_familiar(subject, results[x + 's'], x)
                   if x != 'playlist'
                   else _ss_open_playlist_familiar(subject,
@@ -200,7 +209,8 @@ def _ss_open_general(subject: State, query: str) -> Optional[Mob]:
 
 def _ss_open_playlist(subject: State, query: str) -> Optional[Playlist]:
     api = subject[0]
-    results = api.search(query, LIMIT, type='playlist')['playlists']
+    results = cast(dict,
+                   api.search(query, LIMIT, type='playlist'))['playlists']
     results = _ss_open_playlist_familiar(subject, results)
     num_results, results_familiar = _ss_open_genlen(next(results))
     if num_results:
@@ -221,7 +231,7 @@ def _ss_open_playlist(subject: State, query: str) -> Optional[Playlist]:
         result = api.playlist(next(results_familiar)['id'])
         return cast(Optional[Playlist], _ss_open_notifyuser(result))
     if num_results:
-        user_select = _ss_open_userinput(results)
+        user_select = _ss_open_userinput(next(results))
         if user_select:
             return cast(Optional[Playlist], api.playlist(user_select['id']))
     return None
@@ -230,24 +240,25 @@ def _ss_open_playlist(subject: State, query: str) -> Optional[Playlist]:
 def _ss_open_playlist_familiar(subject: State,
                                results: dict) -> Iterator[Iterator[Playlist]]:
     api = subject[0]
+    auth = cast(SpotifyPKCE, api.auth_manager)
     yield (cast(Playlist, p)
-           for p in results_generator(api.auth_manager, results)
+           for p in results_generator(auth, results)
            if p['id'] == subject[1]['id'])
-    usrid = api.me()['id']
+    usrid = cast(dict, api.me())['id']
     yield (cast(Playlist, p)
-           for p in results_generator(api.auth_manager, results)
+           for p in results_generator(auth, results)
            if p['owner']['id'] == usrid)
     yield (cast(Playlist, p)
-           for p in results_generator(api.auth_manager, results)
+           for p in results_generator(auth, results)
            if api.playlist_is_following(p['id'], [usrid]))
     yield cast(Iterator[Playlist],
-               results_generator(api.auth_manager, results))
+               results_generator(auth, results))
 
 
 def _ss_open_track(variation: MultipleChoiceFunction) -> TypeSpecificSearch:
     def get_track(subject: State, query: str) -> Optional[Track]:
         api = subject[0]
-        results = api.search(query, LIMIT, type='track')['tracks']
+        results = cast(dict, api.search(query, LIMIT, type='track'))['tracks']
         results_tiered = _ss_open_familiar(subject, results, MOBNAMES[0])
         for unconfidence, tier in enumerate(results_tiered):
             num_results, results = _ss_open_genlen(tier)
@@ -267,7 +278,7 @@ def _ss_open_track(variation: MultipleChoiceFunction) -> TypeSpecificSearch:
 def _ss_open_album(variation: MultipleChoiceFunction) -> TypeSpecificSearch:
     def get_album(subject: State, query: str) -> Optional[Album]:
         api = subject[0]
-        results = api.search(query, LIMIT, type='album')['albums']
+        results = cast(dict, api.search(query, LIMIT, type='album'))['albums']
         results = _ss_open_familiar(subject, results, MOBNAMES[0])
         for unconfidence, results in enumerate(results):
             num_results, results = _ss_open_genlen(results)
@@ -285,7 +296,8 @@ def _ss_open_album(variation: MultipleChoiceFunction) -> TypeSpecificSearch:
 def _ss_open_artist(variation: MultipleChoiceFunction) -> TypeSpecificSearch:
     def get_artist(subject: State, query: str) -> Optional[Artist]:
         api = subject[0]
-        results = api.search(query, LIMIT, type='artist')['artists']
+        results = cast(dict,
+                       api.search(query, LIMIT, type='artist'))['artists']
         results = _ss_open_familiar(subject, results, MOBNAMES[0])
         for unconfidence, results in enumerate(results):
             if unconfidence == 2:
@@ -316,21 +328,22 @@ def _ss_open_genlen(generator: Iterator) -> tuple[int, Iterator]:
 def _ss_open_familiar(subject: State, results: dict,
                       mobname: str) -> Iterator[Iterator[Mob]]:
     api = subject[0]
-    yield (r for r in results_generator(api.auth_manager, results)
+    auth = cast(SpotifyPKCE, api.auth_manager)
+    yield (r for r in results_generator(auth, results)
            if mob_in_mob(api, r, subject[1]))
-    yield (r for r in results_generator(api.auth_manager, results)
+    yield (r for r in results_generator(auth, results)
            if any(cast(list,
                        api.current_user_following_artists(a['id'] for a
                                                           in r.get('artists',
                                                                    [r])
            )      )     )                                 )
     liked_songs = liked_songs_cache_check(api)
-    yield (r for r in results_generator(api.auth_manager, results)
+    yield (r for r in results_generator(auth, results)
            if r['id'] in liked_songs[mobname])
-    yield (r for r in results_generator(api.auth_manager, results)
+    yield (r for r in results_generator(auth, results)
            if any(a in liked_songs['artist']
                   for a in r.get('artists') or [r['id']]))
-    yield results_generator(api.auth_manager, results)
+    yield results_generator(auth, results)
 
 
 def _ss_open_firstresult(results: Iterator[Mob]) -> Mob:
@@ -358,20 +371,21 @@ def _ss_open_notifyuser(selection: Optional[Mob] = None) -> Optional[Mob]:
 def _ss_add_mob(api: Spotify, destination: Mob, target: Mob):
     if target['type'] == 'artist':
         raise UnsupportedQueryError('add', str_mob(target))
-    api.playlist_add_items(destination['id'],
-                           iter_mob(api.auth_manager, target))
+    target_items = iter_mob(cast(SpotifyPKCE, api.auth_manager), target)
+    api.playlist_add_items(destination['id'], target_items)
 
 
 def _ss_remove_mob(api: Spotify, destination: Mob, target: Mob):
     if target['type'] == 'artist':
         raise UnsupportedQueryError('remove', str_mob(target))
+    target_items = iter_mob(cast(SpotifyPKCE, api.auth_manager), target)
     api.playlist_remove_all_occurrences_of_items(destination['id'],
-                                                 iter_mob(api.auth_manager,
-                                                           target))
+                                                 target_items)
 
 
 def _ss_play_in_context(api: Spotify, context: Mob, to_play: Mob):
-    context_gen = results_generator(api.auth_manager, context['tracks'])
+    context_gen = results_generator(cast(SpotifyPKCE, api.auth_manager),
+                                    context['tracks'])
     for obj in context_gen:
         if mob_in_mob(api, obj.get('track', obj), to_play):
             api.start_playback(context_uri=context['uri'],

@@ -1,6 +1,6 @@
 """ Caching functions for StreamSort
 
-Copyright (c) 2020 IdmFoundInHim
+Copyright (c) 2021 IdmFoundInHim, under MIT License
 """
 
 from datetime import datetime as dt
@@ -34,7 +34,8 @@ def liked_songs_cache_check(api: Spotify) -> dict[str, Any]:
     latest = cast(dict, api.current_user_saved_tracks())
     if ((dt.now() - dt.fromisoformat(cached['as_of'])).days > 6
             or latest['total'] != cached['total']):
-        return _liked_songs_cache_save(api.auth_manager, latest)
+        return _liked_songs_cache_save(cast(SpotifyPKCE, api.auth_manager),
+                                       latest)
     return cached
 
 

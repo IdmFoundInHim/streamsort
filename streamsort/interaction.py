@@ -1,6 +1,6 @@
 """ Default I/O functions for StreamSort
 
-Copyright (c) 2020 IdmFoundInHim
+Copyright (c) 2021 IdmFoundInHim, under MIT License
 """
 
 notify_user = print

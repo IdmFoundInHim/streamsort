@@ -1,4 +1,6 @@
-""" Copyright (c) 2020 IdmFoundInHim, under MIT license
+""" CLI for StreamSort
+
+Copyright (c) 2021 IdmFoundInHim, under MIT License
 
 Basic rules:
     * Spaces seperate tokens as each line is interpreted left-to-right
@@ -72,14 +74,15 @@ Implementation:
 """
 
 import os
-from typing import Callable, Iterable, Iterator, Optional, Union, cast
+from typing import Callable, Iterator, Optional, Union, cast
+from frozendict import frozendict
 
 from spotipy import Spotify, SpotifyException, SpotifyPKCE
 
 from .constants import CACHE_PATH, CLIENT_ID, REDIRECT_URI, SCOPE
 from .errors import NoResultsError
 from .musictypes import Mob, State, str_mob
-from .sentences import ss_add, ss_open, ss_play, ss_remove
+from .sentences import ss_add, ss_open, ss_play, ss_remove, ss_all, ss_new
 
 SAFE = 0
 IDLE = 1
@@ -113,12 +116,18 @@ def shell() -> int:
     return status
 
 
-sentences = {'open': ss_open, 'add': ss_add, 'remove': ss_remove,
-             'play': ss_play}
 Query = Union[str, Mob]
 Sentence = Callable[[State, Query], State]
 Processor = Callable[[State, Iterator[str]], tuple[Sentence, Query]]
 QueryProcess = Callable[[State, Iterator[str]], Query]
+sentences: dict[str, Sentence] = {'open': ss_open,
+                                  'add': ss_add,
+                                  'remove': ss_remove,
+                                  'play': ss_play,
+                                  'all': ss_all,
+                                  'new': ss_new,
+                                  'get': ss_open,
+}
 
 def process_line(state: State,
                  tokens: Iterator[str]) -> tuple[Sentence, Query]:
@@ -139,47 +148,46 @@ def process_line(state: State,
 
     token = next(tokens, None)
     try:
-        return reserved_control[token](state, tokens)
+        return cast(Processor, reserved_control[token])(state, tokens)
     except TypeError as err:
         raise ValueError(f"Lines starting with '{token}' "
                           "do nothing") from err
     except KeyError:
-        pass        
-    if sentence := sentences.get(token):
+        pass
+    if sentence := sentences.get(cast(str, token)):
         token = next(tokens, None)
         if control := branch_control.get(token):
             try:
-                return (sentence, control(state, tokens))
+                return (sentence, cast(QueryProcess, control)(state, tokens))
             except TypeError as err:
                 raise ValueError(control) from err
-        return (sentence, token + ' ' + ' '.join(tokens))
-    if substate := state.subshells.get(token):
+        return (sentence, cast(str, token) + ' ' + ' '.join(tokens))
+    if substate := state.subshells.get(cast(str, token)):
         subsh_name, token = token, next(tokens, None)
         if token:
             raise ValueError("Subshell loading does not take a parameter. "
                              f"Perhaps use 'in {subsh_name}...")
-        return ((lambda a, b: substate), '')
-    return _process_line_init_subsh(state, tokens, token)
+        return ((lambda a, b: cast(State, substate)), '')
+    return _process_line_init_subsh(state, tokens, cast(str, token))
 
 
 def _process_line_init_subsh(state: State,
                              tokens: Iterator[str],
                              new_subshell: str) -> tuple[Sentence, Query]:
-    subject, query = process_line(state, tokens)
-    state.subshells[new_subshell] = subject(state, query)
-    return (_identity_state, Mob({}))
+    sentence, query = process_line(state, tokens)
+    return (_set_subshell(new_subshell, sentence(state, query)), Mob({}))
 
 
 def _process_line_in(state: State,
-                     tokens: Iterable[str]) -> tuple[Sentence, Query]:
+                     tokens: Iterator[str]) -> tuple[Sentence, Query]:
     try:
         subsh = next(tokens)
     except StopIteration as err:
         raise ValueError("Missing subshell name after 'in'") from err
     try:
-        subject, query = process_line(state, tokens)
-        state.subshells[subsh] = subject(state[2][subsh], query)
-        return (_identity_state, Mob({}))
+        sentence, query = process_line(state, tokens)
+        return (_set_subshell(subsh, sentence(state[2][subsh], query)),
+                Mob({}))
     except KeyError as err:
         raise ValueError("Invalid subshell name after 'in'") from err
 
@@ -188,8 +196,8 @@ def _process_line_track(state: State, tokens: Iterator[str]) -> Mob:
     track_num = next(tokens)
     try:
         return state.mob['tracks']['items'][int(track_num) - 1]
-    except KeyError:
-        raise ValueError(f"'{str(state)}' does not contain tracks")
+    except KeyError as err:
+        raise ValueError(f"'{str(state)}' does not contain tracks") from err
     except (IndexError, ValueError):
         track_nom = ' '.join(tokens)
         if track_num != 'nom':
@@ -202,7 +210,7 @@ def _process_line_track(state: State, tokens: Iterator[str]) -> Mob:
 
 
 def _process_line_track_load(state: State,
-                             tokens: Iterable[str]) -> tuple[Sentence, Query]:
+                             tokens: Iterator[str]) -> tuple[Sentence, Query]:
     mob = _process_line_track(state, tokens)
     new_state = State(state[0], mob, state[2])
     return ((lambda a, b: new_state), '')
@@ -216,6 +224,18 @@ def _process_line_after(state: State, tokens: Iterator[str]) -> Mob:
 def _process_line_nom(state: State, tokens: Iterator[str]) -> str:
     del state
     return ' '.join(tokens)
+
+
+def _set_subshell(subsh_name: str, subsh_state: State) -> Sentence:
+    def set_subshell(subject: State, query: Query) -> State:
+        del query
+        old_subshells = {k: subject.subshells[k] for k in subject.subshells
+                         if k != subsh_name}
+        subshells = frozendict(**old_subshells,
+                               **{subsh_name: subsh_state})
+        return State(subject[0], subject[1], subshells)
+
+    return set_subshell
 
 
 def _identity_state(state: State, query: Query) -> State:
