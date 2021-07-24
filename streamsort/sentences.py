@@ -13,7 +13,7 @@ from .constants import MOB_GET_FUNCTIONS, MOBNAMES, NUMSUGGESTIONS
 from .errors import NoResultsError, UnsupportedQueryError, UnsupportedVerbError
 from .interaction import confirm_action, notify_user
 from .musictypes import Album, Artist, Mob, Playlist, State, Track, str_mob
-from .utilities import iter_mob, contains_uri, mob_in_mob, results_generator
+from .utilities import iter_mob, as_uri, mob_in_mob, results_generator
 
 LIMIT = 50
 Query = Union[str, Mob]
@@ -143,7 +143,7 @@ def ss_remove(subject: State, query: Query) -> State:
 
 
 def _ss_open_process_query(query: str) -> TypeSpecificSearch:
-    if contains_uri(query):
+    if as_uri(query):
         return _ss_open_uri
     tags = {t: (t + ':' in query) for t in MOBNAMES}
     if tags['playlist']:
@@ -163,7 +163,7 @@ def _ss_open_process_query(query: str) -> TypeSpecificSearch:
 
 def _ss_open_uri(subject: State, query: str) -> Optional[Mob]:
     api = subject[0]
-    _, mobtype, mobid = contains_uri(query).split(':')
+    _, mobtype, mobid = as_uri(query).split(':')
     try:
         return MOB_GET_FUNCTIONS[mobtype](api, mobid)
     except KeyError:

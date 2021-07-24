@@ -49,7 +49,7 @@ def results_generator(auth: SpotifyPKCE, page_zero: Mapping) -> Iterator[Mob]:
             yield from page['items']
 
 
-def contains_uri(uri: str):
+def as_uri(uri: str):
     """ Returns the URI in standard format only if present """
     if uri.startswith(MOB_URL_PREFIX):
         try:
