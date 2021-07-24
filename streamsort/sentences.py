@@ -20,17 +20,17 @@ Query = Union[str, Mob]
 TypeSpecificSearch = Callable[[State, str], Optional[Mob]]
 MultipleChoiceFunction = Callable[[Iterator[Mob]], Optional[Mob]]
 
-io_confirm = cast(Callable[[str], bool], confirm_action)
-io_notify = cast(Callable[[str], None], notify_user)
+IO_CONFIRM = cast(Callable[[str], bool], confirm_action)
+IO_NOTIFY = cast(Callable[[str], None], notify_user)
 
 
 def io_inject(confirm: Optional[Callable[[str], bool]] = None,
               notify: Optional[Callable[[str], None]] = None):
     """ Replace default I/O with custom functions """
-    global io_confirm # pylint: disable=global-statement,invalid-name
-    io_confirm = confirm or io_confirm
-    global io_notify # pylint: disable=global-statement,invalid-name
-    io_notify = notify or io_notify
+    global IO_CONFIRM # pylint: disable=global-statement
+    IO_CONFIRM = confirm or IO_CONFIRM
+    global IO_NOTIFY # pylint: disable=global-statement
+    IO_NOTIFY = notify or IO_NOTIFY
 
 
 def ss_open(subject: State, query: Query) -> State:
@@ -83,8 +83,8 @@ def ss_open(subject: State, query: Query) -> State:
 
     Alternates between Track/Album/Artist and Playlist
 
-    When a selection is made, `io_notify` will be called to inform the
-    user. For selections with less certainty, `io_confirm` will be used
+    When a selection is made, `IO_NOTIFY` will be called to inform the
+    user. For selections with less certainty, `IO_CONFIRM` will be used
     to check with the user before finalizing the selection. Custom I/O
     functions may be supplied through `io_inject`.
     """
@@ -100,6 +100,14 @@ def ss_open(subject: State, query: Query) -> State:
 
 
 def ss_add(subject: State, query: Query) -> State:
+    """ Add all songs in query to the subject (playlist)
+
+    The query will be resolved to a Mob via ss_open. The query is not
+    permitted to represent an artist.
+
+    The subject will be returned, pointing to the same mob but updated
+    as it will have changed.
+    """
     if subject.mob['type'] != 'playlist':
         raise UnsupportedVerbError(str_mob(subject.mob), 'add')
     try:
@@ -112,6 +120,17 @@ def ss_add(subject: State, query: Query) -> State:
 
 
 def ss_remove(subject: State, query: Query) -> State:
+    """ Entirely remove all songs in query from the subject (playlist)
+
+    The query will be resolved to a Mob via ss_open. The query is not
+    permitted to represent an artist.
+
+    All instances (rather than only the first) of each song will be
+    removed from the subject.
+
+    The subject will be returned, pointing to the same mob but updated
+    as it will have changed.
+    """
     if subject.mob['type'] != 'playlist':
         raise UnsupportedVerbError(str_mob(subject.mob), 'remove')
     try:
@@ -313,7 +332,7 @@ def _ss_open_firstresult(results: Iterator[Mob]) -> Mob:
 def _ss_open_userinput(results: Iterator[Mob]) -> Optional[Mob]:
     suggestions_given = 0
     for suggestion in results:
-        if io_confirm(f"Continue with {str_mob(suggestion)}?"):
+        if IO_CONFIRM(f"Continue with {str_mob(suggestion)}?"):
             return suggestion
         if (suggestions_given := suggestions_given + 1) > NUMSUGGESTIONS:
             return None
@@ -322,9 +341,9 @@ def _ss_open_userinput(results: Iterator[Mob]) -> Optional[Mob]:
 
 def _ss_open_notifyuser(selection: Optional[Mob] = None) -> Optional[Mob]:
     if selection:
-        io_notify(f"Using {str_mob(selection)}")
+        IO_NOTIFY(f"Using {str_mob(selection)}")
         return selection
-    io_notify("Seach returned no results")
+    IO_NOTIFY("Seach returned no results")
     return None
 
 
@@ -344,8 +363,8 @@ def _ss_remove_mob(api: Spotify, destination: Mob, target: Mob):
 
 
 if __name__ == "__main__":
-    import sh
-    sp, usr = sh.login()
+    from .sh import login
+    sp, usr, _ = login()
     sub = (sp, None)
     io_inject(lambda x: True)
     import doctest
