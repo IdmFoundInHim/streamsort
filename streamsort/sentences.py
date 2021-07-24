@@ -187,9 +187,11 @@ def _ss_open_general(subject: State, query: str) -> Optional[Mob]:
         priority_results, pr_original = tee(roundrobin(*result_gens))
         if first_result := next(priority_results, None):
             if next(priority_results, None):
-                return first_result
+                get_full_object = MOB_GET_FUNCTIONS[first_result['type']]
+                return get_full_object(api, first_result['id'])
             if user_select := _ss_open_userinput(pr_original):
-                return user_select
+                get_full_object = MOB_GET_FUNCTIONS[user_select['type']]
+                return get_full_object(api, user_select['id'])
     return None
 
 
@@ -199,23 +201,26 @@ def _ss_open_playlist(subject: State, query: str) -> Optional[Playlist]:
     results = _ss_open_playlist_familiar(subject, results)
     num_results, results_familiar = _ss_open_genlen(next(results))
     if num_results:
-        return cast(Optional[Playlist],
-                    _ss_open_notifyuser(next(results_familiar)))
+        result = api.playlist(next(results_familiar)['id'])
+        return cast(Playlist | None, _ss_open_notifyuser(result))
     results_f1, results_f2 = tee(next(results))
     first_result = next(results_f1, None)
     if first_result and all(z[0] == z[1] for z in zip(first_result['name'],
                                                       query)):
-        return cast(Optional[Playlist], _ss_open_notifyuser(first_result))
+        result = api.playlist(first_result)
+        return cast(Playlist | None, _ss_open_notifyuser(result))
     if first_result:
         user_select = _ss_open_userinput(results_f2)
         if user_select:
-            return cast(Optional[Playlist], user_select)
+            return cast(Optional[Playlist], api.playlist(user_select['id']))
     num_results, results_familiar = _ss_open_genlen(next(results))
     if num_results == 1:
-        return cast(Optional[Playlist],
-                    _ss_open_notifyuser(next(results_familiar)))
+        result = api.playlist(next(results_familiar)['id'])
+        return cast(Optional[Playlist], _ss_open_notifyuser(result))
     if num_results:
-        return cast(Optional[Playlist], _ss_open_userinput(results))
+        user_select = _ss_open_userinput(results)
+        if user_select:
+            return cast(Optional[Playlist], api.playlist(user_select['id']))
     return None
 
 
@@ -264,11 +269,11 @@ def _ss_open_album(variation: MultipleChoiceFunction) -> TypeSpecificSearch:
         for unconfidence, results in enumerate(results):
             num_results, results = _ss_open_genlen(results)
             if num_results == 1 and unconfidence < 3:
-                return next(results)
+                return api.album(next(results)['id'])
             if num_results:
                 user_select = variation(results,)
                 if user_select:
-                    return cast(Album, user_select)
+                    return cast(Album, api.album(user_select['id']))
         return None
 
     return get_album

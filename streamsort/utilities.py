@@ -66,49 +66,41 @@ def as_uri(uri: str):
     return ''
 
 
-def _track_in_mob(api: Spotify, track: Mob, mob: Mob) -> bool:
+def _track_in_mob(auth: SpotifyPKCE, track: Mob, mob: Mob) -> bool:
     if mob['type'] == 'artist':
         return mob['id'] in (a['id'] for a in track['artists'])
     if mob['type'] == 'album':
         return track['id'] in (t['id'] for t
-                               in results_generator(api.auth_manager,
-                                                    api.album_tracks(mob['id'])))
+                               in results_generator(auth,
+                                                    mob['tracks']))
     if mob['type'] == 'playlist':
         return (track['id']
-                in (t['id'] for t
-                    in results_generator(api.auth_manager,
-                                         cast(dict,
-                                              api.playlist_items(mob['id'])))))
+                in (t['track']['id'] for t
+                    in results_generator(auth, mob['tracks'])))
     return False
 
 
-def _album_in_mob(api: Spotify, album: Mob, mob: Mob) -> bool:
+def _album_in_mob(auth: SpotifyPKCE, album: Mob, mob: Mob) -> bool:
     if mob['type'] == 'artist':
         return mob['id'] in (a['id'] for a in album['artists'])
     if mob['type'] == 'playlist':
         return (album['id'] in
-                (t['album']['id'] for t
-                 in results_generator(api.auth_manager,
-                                      cast(dict, api.playlist_items(mob['id']))
-                ))                    )
+                (t['track']['album']['id'] for t
+                 in results_generator(auth, mob['tracks'])))
     return False
 
 
-def _artist_in_mob(api: Spotify, artist: Mob, mob: Mob) -> bool:
+def _artist_in_mob(auth: SpotifyPKCE, artist: Mob, mob: Mob) -> bool:
     if mob['type'] == 'track':
         return artist['id'] in (a['id'] for a in mob['artists'])
     if mob['type'] == 'album':
         return (artist['id'] in
                 flatten(t['artists'] for t
-                        in results_generator(api.auth_manager,
-                                             api.album_tracks(mob['id']))))
+                        in results_generator(auth, mob['tracks'])))
     if mob['type'] == 'playlist':
         return (artist['id'] in
-                flatten(t['artists'] for t
-                        in results_generator(api.auth_manager,
-                                             cast(dict,
-                                                  api.playlist_items(mob['id'])
-                )       )                    )    )
+                flatten(t['track']['artists'] for t
+                        in results_generator(auth, mob['tracks'])))
     return False
 
 
@@ -138,7 +130,7 @@ def mob_in_mob(api: Spotify, obj: Mob, lst: Mob) -> bool:
     if obj['uri'] == lst['uri']:
         return True
     if test := _MOB_SPECIFIC_TESTS.get(obj['type']):
-        return test(api, obj, lst)
+        return test(api.auth_manager, obj, lst)
     return False
 
 
