@@ -5,7 +5,7 @@ with open('README.md', 'r') as fh:
 
 setuptools.setup(
     name='streamsort',
-    version='0.0.0',
+    version='0.0.1a0',
     author='IdmFoundInHim',
     author_email='idmfoundinhim@gmail.com',
     description='Power tools for your playlists',
