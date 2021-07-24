@@ -15,7 +15,10 @@ MOB_GET_FUNCTIONS = {
     'track': Spotify.track,
     'album': Spotify.album,
     'artist': Spotify.artist,
-    'playlist': Spotify.playlist
+    'playlist': Spotify.playlist,
+    'episode': Spotify.episode,
+    'show': Spotify.show,
+    'user': Spotify.user
 }
 NUMSUGGESTIONS = 3
 SCOPE = ('user-library-read user-follow-read playlist-read-private '
