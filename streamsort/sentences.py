@@ -110,12 +110,8 @@ def ss_add(subject: State, query: Query) -> State:
     """
     if subject.mob['type'] != 'playlist':
         raise UnsupportedVerbError(str_mob(subject.mob), 'add')
-    try:
-        _ss_add_mob(subject.api, subject.mob, cast(Mob, query))
-    except TypeError:
-        simulated_state = State(subject.api, subject.mob, {})
-        _ss_add_mob(subject.api, subject.mob,
-                    ss_open(simulated_state, query).mob)
+    _ss_add_mob(subject.api, subject.mob,
+                ss_open(subject, query).mob)
     return ss_open(subject, subject.mob['uri'])
 
 
@@ -133,13 +129,20 @@ def ss_remove(subject: State, query: Query) -> State:
     """
     if subject.mob['type'] != 'playlist':
         raise UnsupportedVerbError(str_mob(subject.mob), 'remove')
-    try:
-        _ss_remove_mob(subject.api, subject.mob, cast(Mob, query))
-    except TypeError:
-        simulated_state = State(subject.api, subject.mob, {})
-        _ss_remove_mob(subject.api, subject.mob,
-                    ss_open(simulated_state, query).mob)
+    _ss_remove_mob(subject.api, subject.mob,
+                   ss_open(subject, query).mob)
     return ss_open(subject, subject.mob['uri'])
+
+
+def ss_play(subject: State, query: Query) -> State:
+    to_play = ss_open(subject, query).mob
+    if (subject.mob['type'] not in ['track', 'artist']
+            and mob_in_mob(subject.api, to_play, subject.mob)):
+        _ss_play_in_context(subject.api, subject.mob, to_play)
+    else:
+        subject.api.start_playback(uris=list(iter_mob(subject.api.auth_manager,
+                                                      to_play)))
+    return subject
 
 
 def _ss_open_process_query(query: str) -> TypeSpecificSearch:
@@ -365,6 +368,15 @@ def _ss_remove_mob(api: Spotify, destination: Mob, target: Mob):
     api.playlist_remove_all_occurrences_of_items(destination['id'],
                                                  iter_mob(api.auth_manager,
                                                            target))
+
+
+def _ss_play_in_context(api: Spotify, context: Mob, to_play: Mob):
+    context_gen = results_generator(api.auth_manager, context['tracks'])
+    for obj in context_gen:
+        if mob_in_mob(api, obj.get('track', obj), to_play):
+            api.start_playback(context_uri=context['uri'],
+                               offset=obj.get('track', obj))
+            break
 
 
 if __name__ == "__main__":

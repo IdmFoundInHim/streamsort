@@ -79,7 +79,7 @@ from spotipy import Spotify, SpotifyException, SpotifyPKCE
 from .constants import CACHE_PATH, CLIENT_ID, REDIRECT_URI, SCOPE
 from .errors import NoResultsError
 from .musictypes import Mob, State, str_mob
-from .sentences import ss_add, ss_open, ss_remove
+from .sentences import ss_add, ss_open, ss_play, ss_remove
 
 SAFE = 0
 IDLE = 1
@@ -113,7 +113,8 @@ def shell() -> int:
     return status
 
 
-sentences = {'open': ss_open, 'add': ss_add, 'remove': ss_remove}
+sentences = {'open': ss_open, 'add': ss_add, 'remove': ss_remove,
+             'play': ss_play}
 Query = Union[str, Mob]
 Sentence = Callable[[State, Query], State]
 Processor = Callable[[State, Iterator[str]], tuple[Sentence, Query]]

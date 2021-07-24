@@ -39,7 +39,7 @@ def results_generator(auth: SpotifyPKCE, page_zero: Mapping) -> Iterator[Mob]:
             page = page_r.json()
             yield from page['items']
         except requests.exceptions.HTTPError:
-            if 'offset=2000' in nexturl:
+            if 'offset=1000' in nexturl:
                 return
             header = get_header(auth.get_access_token(check_cache=False))
             page = {'next': nexturl}
@@ -95,12 +95,14 @@ def _artist_in_mob(auth: SpotifyPKCE, artist: Mob, mob: Mob) -> bool:
         return artist['uri'] in (a['uri'] for a in mob['artists'])
     if mob['type'] == 'album':
         return (artist['uri'] in
-                flatten(t['artists'] for t
-                        in results_generator(auth, mob['tracks'])))
+                (a['uri'] for a in
+                 flatten(t['artists'] for t
+                         in results_generator(auth, mob['tracks']))))
     if mob['type'] == 'playlist':
         return (artist['uri'] in
-                flatten(t['track']['artists'] for t
-                        in results_generator(auth, mob['tracks'])))
+                (a['uri'] for a in
+                 flatten(t['track']['artists'] for t
+                         in results_generator(auth, mob['tracks']))))
     return False
 
 

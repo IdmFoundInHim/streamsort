@@ -22,4 +22,5 @@ MOB_GET_FUNCTIONS = {
 }
 NUMSUGGESTIONS = 3
 SCOPE = ('user-library-read user-follow-read playlist-read-private '
-         'playlist-modify-private playlist-modify-public')
+         + 'playlist-modify-private playlist-modify-public '
+         + 'user-modify-playback-state')
