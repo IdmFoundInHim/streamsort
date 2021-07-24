@@ -74,6 +74,7 @@ Implementation:
 """
 
 import os
+from streamsort.utilities import results_generator
 from typing import Callable, Iterator, Optional, Union, cast
 from frozendict import frozendict
 
@@ -120,7 +121,7 @@ Query = Union[str, Mob]
 Sentence = Callable[[State, Query], State]
 Processor = Callable[[State, Iterator[str]], tuple[Sentence, Query]]
 QueryProcess = Callable[[State, Iterator[str]], Query]
-sentences: dict[str, Sentence] = {'open': ss_open,
+SENTENCES: dict[str, Sentence] = {'open': ss_open,
                                   'add': ss_add,
                                   'remove': ss_remove,
                                   'play': ss_play,
@@ -154,7 +155,7 @@ def process_line(state: State,
                           "do nothing") from err
     except KeyError:
         pass
-    if sentence := sentences.get(cast(str, token)):
+    if sentence := SENTENCES.get(cast(str, token)):
         token = next(tokens, None)
         if control := branch_control.get(token):
             try:
@@ -195,18 +196,31 @@ def _process_line_in(state: State,
 def _process_line_track(state: State, tokens: Iterator[str]) -> Mob:
     track_num = next(tokens)
     try:
-        return state.mob['tracks']['items'][int(track_num) - 1]
+        track_num = int(track_num)
+        track = state.mob['tracks']['items'][track_num - 1]
+        return cast(Mob, state.api.track(track.get('track', track)['id']))
     except KeyError as err:
         raise ValueError(f"'{str(state)}' does not contain tracks") from err
-    except (IndexError, ValueError):
-        track_nom = ' '.join(tokens)
-        if track_num != 'nom':
-            track_nom = f'{track_num} {track_nom}'
-        query = next((t for t in state.mob['tracks']['items']
-                        if track_nom.lower() == t['name'].lower()), None)
-    if not query:
+    except IndexError:
+        all_tracks = results_generator(cast(SpotifyPKCE,
+                                            state.api.auth_manager),
+                                       state.mob['tracks'])
+        targeted_track_num = 1
+        while targeted_track_num != track_num and next(all_tracks, None):
+            targeted_track_num += 1
+        if targeted_track := next(all_tracks, None):
+            targeted_track = targeted_track.get('track', targeted_track)['id']
+            return cast(Mob, state.api.track(targeted_track))
+    except ValueError:
+        pass
+    track_nom = ' '.join(tokens)
+    if track_num != 'nom':
+        track_nom = f'{track_num} {track_nom}'.lower()
+    track_obj = next((t.get('track', t) for t in state.mob['tracks']['items']
+                      if track_nom == t.get('track', t)['name'].lower()), None)
+    if not track_obj:
         raise ValueError(f"Track {track_nom} was not found")
-    return query
+    return cast(Mob, state.api.track(track_obj.get('track', track_obj)['id']))
 
 
 def _process_line_track_load(state: State,
