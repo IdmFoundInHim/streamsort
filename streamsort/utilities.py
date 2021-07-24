@@ -68,46 +68,62 @@ def as_uri(uri: str):
 
 def _track_in_mob(auth: SpotifyPKCE, track: Mob, mob: Mob) -> bool:
     if mob['type'] == 'artist':
-        return mob['id'] in (a['id'] for a in track['artists'])
+        return mob['uri'] in (a['uri'] for a in track['artists'])
     if mob['type'] == 'album':
-        return track['id'] in (t['id'] for t
+        return track['uri'] in (t['uri'] for t
                                in results_generator(auth,
                                                     mob['tracks']))
     if mob['type'] == 'playlist':
-        return (track['id']
-                in (t['track']['id'] for t
+        return (track['uri']
+                in (t['track']['uri'] for t
                     in results_generator(auth, mob['tracks'])))
     return False
 
 
 def _album_in_mob(auth: SpotifyPKCE, album: Mob, mob: Mob) -> bool:
     if mob['type'] == 'artist':
-        return mob['id'] in (a['id'] for a in album['artists'])
+        return mob['uri'] in (a['uri'] for a in album['artists'])
     if mob['type'] == 'playlist':
-        return (album['id'] in
-                (t['track']['album']['id'] for t
+        return (album['uri'] in
+                (t['track']['album']['uri'] for t
                  in results_generator(auth, mob['tracks'])))
     return False
 
 
 def _artist_in_mob(auth: SpotifyPKCE, artist: Mob, mob: Mob) -> bool:
     if mob['type'] == 'track':
-        return artist['id'] in (a['id'] for a in mob['artists'])
+        return artist['uri'] in (a['uri'] for a in mob['artists'])
     if mob['type'] == 'album':
-        return (artist['id'] in
+        return (artist['uri'] in
                 flatten(t['artists'] for t
                         in results_generator(auth, mob['tracks'])))
     if mob['type'] == 'playlist':
-        return (artist['id'] in
+        return (artist['uri'] in
                 flatten(t['track']['artists'] for t
                         in results_generator(auth, mob['tracks'])))
     return False
+
+
+def _playlist_in_playlist(auth: SpotifyPKCE, sub: Mob, lst: Mob) -> bool:
+    if lst['type'] != 'playlist':
+        return False
+    lst_gen = (o['track'] for o in results_generator(auth, lst['tracks']))
+    sub_gen = (o['track'] for o in results_generator(auth, sub['tracks']))
+    sub_gen_first = next(sub_gen, {'uri': None})['uri']
+    for track in lst_gen:
+        if track['uri'] == sub_gen_first:
+            break
+    for track in sub_gen:
+        if next(lst_gen, {'uri': None})['uri'] != track['uri']:
+            return False
+    return True
 
 
 _MOB_SPECIFIC_TESTS = {
     'track': _track_in_mob,
     'album': _album_in_mob,
     'artist': _artist_in_mob,
+    'playlist': _playlist_in_playlist
 }
 
 
@@ -141,4 +157,4 @@ def iter_mob(auth: SpotifyPKCE, mob: Mob) -> Iterator[str]:
         mob_tracks = [mob]
     if mob['type'] == 'playlist':
         mob_tracks = (t['track'] for t in mob_tracks)
-    yield from (t['id'] for t in mob_tracks)
+    yield from (t['uri'] for t in mob_tracks)
