@@ -3,9 +3,10 @@
 Copyright (c) 2021 IdmFoundInHim, under MIT License
 """
 
-from datetime import datetime as dt
 import json
-from typing import Any, Mapping, cast
+from collections.abc import Mapping
+from datetime import datetime as dt
+from typing import Any, cast
 
 from spotipy import Spotify, SpotifyPKCE
 

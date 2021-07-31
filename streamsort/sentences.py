@@ -3,7 +3,8 @@
 Copyright (c) 2021 IdmFoundInHim, under MIT License
 """
 from itertools import tee
-from typing import Callable, Iterator, Optional, Union, cast
+from collections.abc import Callable, Iterator
+from typing import cast
 
 from more_itertools import roundrobin
 from spotipy import Spotify, SpotifyPKCE
@@ -16,16 +17,16 @@ from .musictypes import Album, Artist, Mob, Playlist, State, Track, str_mob
 from .utilities import iter_mob, as_uri, mob_in_mob, results_generator
 
 LIMIT = 50
-Query = Union[str, Mob]
-TypeSpecificSearch = Callable[[State, str], Optional[Mob]]
-MultipleChoiceFunction = Callable[[Iterator[Mob]], Optional[Mob]]
+Query = str | Mob
+TypeSpecificSearch = Callable[[State, str], Mob | None]
+MultipleChoiceFunction = Callable[[Iterator[Mob]], Mob | None]
 
 IO_CONFIRM = cast(Callable[[str], bool], confirm_action)
 IO_NOTIFY = cast(Callable[[str], None], notify_user)
 
 
-def io_inject(confirm: Optional[Callable[[str], bool]] = None,
-              notify: Optional[Callable[[str], None]] = None):
+def io_inject(confirm: Callable[[str], bool] | None = None,
+              notify: Callable[[str], None] | None = None):
     """ Replace default I/O with custom functions """
     global IO_CONFIRM # pylint: disable=global-statement
     IO_CONFIRM = confirm or IO_CONFIRM
@@ -88,11 +89,9 @@ def ss_open(subject: State, query: Query) -> State:
     to check with the user before finalizing the selection. Custom I/O
     functions may be supplied through `io_inject`.
     """
-    try:
-        assert cast(Mob, query)['uri']
-        return State(subject.api, cast(Mob, query))
-    except (AssertionError, TypeError):
-        search_query = cast(str, query)
+    if isinstance(query, Mob):
+        return State(subject.api, query)
+    search_query = cast(str, query)
     out = _ss_open_process_query(search_query)(subject, search_query)
     if out is None:
         raise NoResultsError
@@ -173,7 +172,7 @@ def _ss_open_process_query(query: str) -> TypeSpecificSearch:
     return _ss_open_general
 
 
-def _ss_open_uri(subject: State, query: str) -> Optional[Mob]:
+def _ss_open_uri(subject: State, query: str) -> Mob | None:
     api = subject[0]
     _, mobtype, mobid = as_uri(query).split(':')
     try:
@@ -182,7 +181,7 @@ def _ss_open_uri(subject: State, query: str) -> Optional[Mob]:
         return None
 
 
-def _ss_open_general(subject: State, query: str) -> Optional[Mob]:
+def _ss_open_general(subject: State, query: str) -> Mob | None:
     api = subject[0]
     results = cast(dict, api.search(query, LIMIT, type=','.join(MOBNAMES)))
     results = {x: _ss_open_familiar(subject, results[x + 's'], x)
@@ -207,7 +206,7 @@ def _ss_open_general(subject: State, query: str) -> Optional[Mob]:
     return None
 
 
-def _ss_open_playlist(subject: State, query: str) -> Optional[Playlist]:
+def _ss_open_playlist(subject: State, query: str) -> Playlist | None:
     api = subject[0]
     results = cast(dict,
                    api.search(query, LIMIT, type='playlist'))['playlists']
@@ -225,15 +224,15 @@ def _ss_open_playlist(subject: State, query: str) -> Optional[Playlist]:
     if first_result:
         user_select = _ss_open_userinput(results_f2)
         if user_select:
-            return cast(Optional[Playlist], api.playlist(user_select['id']))
+            return cast(Playlist | None, api.playlist(user_select['id']))
     num_results, results_familiar = _ss_open_genlen(next(results))
     if num_results == 1:
         result = api.playlist(next(results_familiar)['id'])
-        return cast(Optional[Playlist], _ss_open_notifyuser(result))
+        return cast(Playlist | None, _ss_open_notifyuser(result))
     if num_results:
         user_select = _ss_open_userinput(next(results))
         if user_select:
-            return cast(Optional[Playlist], api.playlist(user_select['id']))
+            return cast(Playlist | None, api.playlist(user_select['id']))
     return None
 
 
@@ -256,7 +255,7 @@ def _ss_open_playlist_familiar(subject: State,
 
 
 def _ss_open_track(variation: MultipleChoiceFunction) -> TypeSpecificSearch:
-    def get_track(subject: State, query: str) -> Optional[Track]:
+    def get_track(subject: State, query: str) -> Track | None:
         api = subject[0]
         results = cast(dict, api.search(query, LIMIT, type='track'))['tracks']
         results_tiered = _ss_open_familiar(subject, results, MOBNAMES[0])
@@ -276,7 +275,7 @@ def _ss_open_track(variation: MultipleChoiceFunction) -> TypeSpecificSearch:
 
 
 def _ss_open_album(variation: MultipleChoiceFunction) -> TypeSpecificSearch:
-    def get_album(subject: State, query: str) -> Optional[Album]:
+    def get_album(subject: State, query: str) -> Album | None:
         api = subject[0]
         results = cast(dict, api.search(query, LIMIT, type='album'))['albums']
         results = _ss_open_familiar(subject, results, MOBNAMES[0])
@@ -294,7 +293,7 @@ def _ss_open_album(variation: MultipleChoiceFunction) -> TypeSpecificSearch:
 
 
 def _ss_open_artist(variation: MultipleChoiceFunction) -> TypeSpecificSearch:
-    def get_artist(subject: State, query: str) -> Optional[Artist]:
+    def get_artist(subject: State, query: str) -> Artist | None:
         api = subject[0]
         results = cast(dict,
                        api.search(query, LIMIT, type='artist'))['artists']
@@ -350,7 +349,7 @@ def _ss_open_firstresult(results: Iterator[Mob]) -> Mob:
     return cast(Mob, _ss_open_notifyuser(next(results)))
 
 
-def _ss_open_userinput(results: Iterator[Mob]) -> Optional[Mob]:
+def _ss_open_userinput(results: Iterator[Mob]) -> Mob | None:
     suggestions_given = 0
     for suggestion in results:
         if IO_CONFIRM(f"Continue with {str_mob(suggestion)}?"):
@@ -360,7 +359,7 @@ def _ss_open_userinput(results: Iterator[Mob]) -> Optional[Mob]:
     return None
 
 
-def _ss_open_notifyuser(selection: Optional[Mob] = None) -> Optional[Mob]:
+def _ss_open_notifyuser(selection: Mob | None = None) -> Mob | None:
     if selection:
         IO_NOTIFY(f"Using {str_mob(selection)}")
         return selection

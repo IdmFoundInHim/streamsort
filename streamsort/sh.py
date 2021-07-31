@@ -74,16 +74,17 @@ Implementation:
 """
 
 import os
-from streamsort.utilities import results_generator
-from typing import Callable, Iterator, Optional, Union, cast
-from frozendict import frozendict
+from collections.abc import Callable, Iterator
+from typing import cast
 
+from frozendict import frozendict
 from spotipy import Spotify, SpotifyException, SpotifyPKCE
 
 from .constants import CACHE_PATH, CLIENT_ID, REDIRECT_URI, SCOPE
 from .errors import NoResultsError
 from .musictypes import Mob, State, str_mob
-from .sentences import ss_add, ss_open, ss_play, ss_remove, ss_all, ss_new
+from .sentences import ss_add, ss_all, ss_new, ss_open, ss_play, ss_remove
+from .utilities import results_generator
 
 SAFE = 0
 IDLE = 1
@@ -117,7 +118,7 @@ def shell() -> int:
     return status
 
 
-Query = Union[str, Mob]
+Query = str | Mob
 Sentence = Callable[[State, Query], State]
 Processor = Callable[[State, Iterator[str]], tuple[Sentence, Query]]
 QueryProcess = Callable[[State, Iterator[str]], Query]
@@ -132,14 +133,14 @@ SENTENCES: dict[str, Sentence] = {'open': ss_open,
 
 def process_line(state: State,
                  tokens: Iterator[str]) -> tuple[Sentence, Query]:
-    reserved_control: dict[Optional[str], Optional[Processor]] = {
+    reserved_control: dict[str | None, Processor | None] = {
         'in': _process_line_in,
         'after': process_line,
         'track': _process_line_track_load,
         'nom': None,
         None: lambda a, b: (_identity_state, Mob({}))
     }
-    branch_control: dict[Optional[str], Union[QueryProcess, str]] = {
+    branch_control: dict[str | None, QueryProcess | str] = {
         'in': "Parameter may not start with 'in'. Perhaps use 'nom in'",
         'after': _process_line_after,
         'track': _process_line_track,
@@ -245,8 +246,7 @@ def _set_subshell(subsh_name: str, subsh_state: State) -> Sentence:
         del query
         old_subshells = {k: subject.subshells[k] for k in subject.subshells
                          if k != subsh_name}
-        subshells = frozendict(**old_subshells,
-                               **{subsh_name: subsh_state})
+        subshells = frozendict(old_subshells | {subsh_name: subsh_state})
         return State(subject[0], subject[1], subshells)
 
     return set_subshell

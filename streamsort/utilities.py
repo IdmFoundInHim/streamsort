@@ -3,7 +3,7 @@
 Copyright (c) 2020 IdmFoundInHim, except where otherwise credited
 """
 
-from typing import Iterator, Mapping
+from collections.abc import Iterator, Mapping
 from urllib import parse as urlparse
 
 from more_itertools import flatten
@@ -25,12 +25,15 @@ def get_header(oauth: str) -> dict:
 
 def results_generator(auth: SpotifyPKCE, page_zero: Mapping) -> Iterator[Mob]:
     """ Cycles through multi-page responses from Spotify """
-    if not all(k in page_zero for k in ['items', 'next']):
-        raise ValueError
-    yield from page_zero['items']
-    if not page_zero['next']:
-        return
-    page = {'next': page_zero['next']}
+    try:
+        yield from page_zero['items']
+        if not page_zero['next']:
+            # Included seperately from loop condition because it avoids
+            # unnecessary token access (and undesired indentation)
+            return
+    except KeyError as err:
+        raise ValueError from err
+    page = page_zero
     header = get_header(auth.get_access_token())
     while nexturl := page['next']:
         try:
