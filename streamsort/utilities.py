@@ -156,6 +156,9 @@ def mob_in_mob(api: Spotify, obj: Mob, lst: Mob) -> bool:
 
 
 def iter_mob(auth: SpotifyPKCE, mob: Mob) -> Iterator[str]:
+    if objects := mob.get('objects'):
+        for obj in objects:
+            yield from iter_mob(auth, obj)
     if tracks := mob.get('tracks', mob.get('episodes')):
         mob_tracks = results_generator(auth, tracks)
     else:
@@ -163,3 +166,27 @@ def iter_mob(auth: SpotifyPKCE, mob: Mob) -> Iterator[str]:
     if mob['type'] == 'playlist':
         mob_tracks = (t['track'] for t in mob_tracks)
     yield from (t['uri'] for t in mob_tracks)
+
+
+def mob_eq(mob1: Mob, mob2: Mob) -> bool:
+    try:
+        return mob1['uri'] == mob2['uri']
+    except KeyError:
+        return ss_eq(mob1, mob2)
+
+
+def ss_eq(ss1: Mob, ss2: Mob) -> bool:
+    try:
+        ss1_objects, ss2_objects = ss1['objects'], ss2['objects']
+    except KeyError as err:
+        raise ValueError("DEVELOPER: SS Object needs 'objects' key") from err
+    for obj in ss1_objects:
+        if uri := obj.get('uri'):
+            if uri not in (o.get('uri') for o in ss2_objects):
+                return False
+        elif obj.get('objects'):
+            if not any(ss_eq(obj, o) for o in ss2_objects if o.get('objects')):
+                return False
+        else:
+            raise ValueError("DEVELOPER: SS Object contained invalid objects")
+    return True

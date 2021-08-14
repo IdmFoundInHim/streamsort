@@ -2,8 +2,8 @@
 
 Copyright (c) 2021 IdmFoundInHim, under MIT License
 """
+from collections.abc import Callable, Iterator, Mapping
 from itertools import tee
-from collections.abc import Callable, Iterator
 from typing import cast
 
 from more_itertools import roundrobin
@@ -89,7 +89,7 @@ def ss_open(subject: State, query: Query) -> State:
     to check with the user before finalizing the selection. Custom I/O
     functions may be supplied through `io_inject`.
     """
-    if isinstance(query, Mob):
+    if isinstance(query, Mapping):
         return State(subject.api, query)
     search_query = cast(str, query)
     out = _ss_open_process_query(search_query)(subject, search_query)
@@ -107,11 +107,15 @@ def ss_add(subject: State, query: Query) -> State:
     The subject will be returned, pointing to the same mob but updated
     as it will have changed.
     """
-    if subject.mob['type'] != 'playlist':
+    if subject.mob['type'] == 'playlist':
+        _ss_add_to_playlist(subject.api, subject.mob,
+                            ss_open(subject, query).mob)
+        return ss_open(subject, subject.mob['uri'])
+    elif subject.mob.get('objects'):
+        return ss_open(subject,
+                       _ss_add_to_ss(subject.mob, ss_open(subject, query).mob))
+    else:
         raise UnsupportedVerbError(str_mob(subject.mob), 'add')
-    _ss_add_mob(subject.api, subject.mob,
-                ss_open(subject, query).mob)
-    return ss_open(subject, subject.mob['uri'])
 
 
 def ss_remove(subject: State, query: Query) -> State:
@@ -126,11 +130,16 @@ def ss_remove(subject: State, query: Query) -> State:
     The subject will be returned, pointing to the same mob but updated
     as it will have changed.
     """
-    if subject.mob['type'] != 'playlist':
-        raise UnsupportedVerbError(str_mob(subject.mob), 'remove')
-    _ss_remove_mob(subject.api, subject.mob,
-                   ss_open(subject, query).mob)
-    return ss_open(subject, subject.mob['uri'])
+    if subject.mob['type'] == 'playlist':
+        _ss_remove_from_playlist(subject.api, subject.mob,
+                                 ss_open(subject, query).mob)
+        return ss_open(subject, subject.mob['uri'])
+    elif subject.mob.get('objects'):
+        return ss_open(subject,
+                       _ss_remove_from_ss(subject.mob,
+                                          ss_open(subject, query).mob))
+    else:
+        raise UnsupportedVerbError(str_mob(subject.mob), 'add')
 
 
 def ss_play(subject: State, query: Query) -> State:
@@ -367,19 +376,33 @@ def _ss_open_notifyuser(selection: Mob | None = None) -> Mob | None:
     return None
 
 
-def _ss_add_mob(api: Spotify, destination: Mob, target: Mob):
+def _ss_add_to_playlist(api: Spotify, destination: Mob, target: Mob):
     if target['type'] == 'artist':
         raise UnsupportedQueryError('add', str_mob(target))
     target_items = iter_mob(cast(SpotifyPKCE, api.auth_manager), target)
     api.playlist_add_items(destination['id'], target_items)
 
 
-def _ss_remove_mob(api: Spotify, destination: Mob, target: Mob):
+def _ss_add_to_ss(ss_obj: Mob, new_mob: Mob) -> Mob:
+    return type(ss_obj)(**{k: type(ss_obj[k])([new_mob, *ss_obj[k]])
+                           if k == 'objects' else ss_obj[k]
+                           for k in ss_obj})
+
+
+def _ss_remove_from_playlist(api: Spotify, destination: Mob, target: Mob):
     if target['type'] == 'artist':
         raise UnsupportedQueryError('remove', str_mob(target))
     target_items = iter_mob(cast(SpotifyPKCE, api.auth_manager), target)
     api.playlist_remove_all_occurrences_of_items(destination['id'],
                                                  target_items)
+
+
+def _ss_remove_from_ss(ss_obj: Mob, rm_mob: Mob) -> Mob:
+    new_objects = [_ss_remove_from_ss(x, rm_mob) if x.get('objects') else x
+                   for x in ss_obj if not mob_eq(rm_mob, x)]
+    return type(ss_obj)(**{k: type(ss_obj[k])(new_objects)
+                           if k == 'objects' else ss_obj[k]
+                           for k in ss_obj})
 
 
 def _ss_play_in_context(api: Spotify, context: Mob, to_play: Mob):
