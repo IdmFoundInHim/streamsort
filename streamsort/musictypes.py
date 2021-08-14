@@ -4,13 +4,12 @@ Copyright (c) 2021 IdmFoundInHim, under MIT License
 """
 
 from __future__ import annotations
+
 from collections.abc import Mapping
 from typing import NamedTuple, NewType
 
 from frozendict import frozendict
 from spotipy import Spotify
-
-from .errors import UnexpectedResponseException
 
 Mob = NewType('Mob', Mapping)
 Track = NewType('Track', Mob)
@@ -46,13 +45,3 @@ class State(NamedTuple):
     api: Spotify
     mob: Mob
     subshells: frozendict[str, State] = frozendict()
-
-    def __str__(self):
-        mob = self.mob
-        assert isinstance(mob, dict)
-        try:
-            return mob.get('name',
-                        mob.get('display_name',
-                                mob.get('id', mob['href'])))
-        except KeyError as err:
-            raise UnexpectedResponseException from err
