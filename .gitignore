@@ -1,8 +1,8 @@
 __pycache__/
+streamsort.egg-info/
 env/
+
 .cache/
 .cache-*
-APIkeys.json
-APIstate.json
+
 .notes*
-streamsort.egg-info/
