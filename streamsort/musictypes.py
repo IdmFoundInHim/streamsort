@@ -25,7 +25,8 @@ _MOB_STRS = {
     'playlist': '{}, {}{} songs',
     'episode': '"{}" from *{}{}*',
     'show': '*{}* from {}{}',
-    'user': '@{}{}{}'
+    'user': '@{}{}{}',
+    'ss': ':{}{}{}'
 }
 
 

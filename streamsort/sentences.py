@@ -6,7 +6,8 @@ from collections.abc import Callable, Iterator, Mapping
 from itertools import tee
 from typing import cast
 
-from more_itertools import roundrobin
+from frozendict import frozendict
+from more_itertools import chunked, roundrobin
 from spotipy import Spotify, SpotifyPKCE
 
 from .cache import liked_songs_cache_check
@@ -14,7 +15,7 @@ from .constants import MOB_GET_FUNCTIONS, MOBNAMES, NUMSUGGESTIONS
 from .errors import NoResultsError, UnsupportedQueryError, UnsupportedVerbError
 from .interaction import confirm_action, notify_user
 from .musictypes import Album, Artist, Mob, Playlist, State, Track, str_mob
-from .utilities import iter_mob, as_uri, mob_in_mob, results_generator
+from .utilities import as_uri, iter_mob, mob_eq, mob_in_mob, results_generator
 
 LIMIT = 50
 Query = str | Mob
@@ -111,7 +112,7 @@ def ss_add(subject: State, query: Query) -> State:
         _ss_add_to_playlist(subject.api, subject.mob,
                             ss_open(subject, query).mob)
         return ss_open(subject, subject.mob['uri'])
-    elif subject.mob.get('objects'):
+    elif subject.mob.get('objects') is not None:
         return ss_open(subject,
                        _ss_add_to_ss(subject.mob, ss_open(subject, query).mob))
     else:
@@ -134,7 +135,7 @@ def ss_remove(subject: State, query: Query) -> State:
         _ss_remove_from_playlist(subject.api, subject.mob,
                                  ss_open(subject, query).mob)
         return ss_open(subject, subject.mob['uri'])
-    elif subject.mob.get('objects'):
+    elif subject.mob.get('objects') is not None:
         return ss_open(subject,
                        _ss_remove_from_ss(subject.mob,
                                           ss_open(subject, query).mob))
@@ -144,7 +145,7 @@ def ss_remove(subject: State, query: Query) -> State:
 
 def ss_play(subject: State, query: Query) -> State:
     to_play = ss_open(subject, query).mob
-    if (subject.mob['type'] not in ['track', 'artist']
+    if (subject.mob['type'] in ['playlist', 'album', 'show']
             and mob_in_mob(subject.api, to_play, subject.mob)):
         _ss_play_in_context(subject.api, subject.mob, to_play)
     else:
@@ -251,7 +252,7 @@ def _ss_open_playlist_familiar(subject: State,
     auth = cast(SpotifyPKCE, api.auth_manager)
     yield (cast(Playlist, p)
            for p in results_generator(auth, results)
-           if p['id'] == subject[1]['id'])
+           if p['id'] == subject[1].get('id', False))
     usrid = cast(dict, api.me())['id']
     yield (cast(Playlist, p)
            for p in results_generator(auth, results)
@@ -379,8 +380,11 @@ def _ss_open_notifyuser(selection: Mob | None = None) -> Mob | None:
 def _ss_add_to_playlist(api: Spotify, destination: Mob, target: Mob):
     if target['type'] == 'artist':
         raise UnsupportedQueryError('add', str_mob(target))
-    target_items = iter_mob(cast(SpotifyPKCE, api.auth_manager), target)
-    api.playlist_add_items(destination['id'], target_items)
+    target_items = chunked(iter_mob(cast(SpotifyPKCE, api.auth_manager),
+                                    target, keep_local=False),
+                           100)
+    for item_group in target_items:
+        api.playlist_add_items(destination['id'], item_group)
 
 
 def _ss_add_to_ss(ss_obj: Mob, new_mob: Mob) -> Mob:
@@ -392,9 +396,12 @@ def _ss_add_to_ss(ss_obj: Mob, new_mob: Mob) -> Mob:
 def _ss_remove_from_playlist(api: Spotify, destination: Mob, target: Mob):
     if target['type'] == 'artist':
         raise UnsupportedQueryError('remove', str_mob(target))
-    target_items = iter_mob(cast(SpotifyPKCE, api.auth_manager), target)
-    api.playlist_remove_all_occurrences_of_items(destination['id'],
-                                                 target_items)
+    target_items = chunked(iter_mob(cast(SpotifyPKCE, api.auth_manager),
+                                    target), # May need keep_local=False
+                           100)
+    for item_group in target_items:
+        api.playlist_remove_all_occurrences_of_items(destination['id'],
+                                                     item_group)
 
 
 def _ss_remove_from_ss(ss_obj: Mob, rm_mob: Mob) -> Mob:

@@ -32,7 +32,7 @@ def results_generator(auth: SpotifyPKCE, page_zero: Mapping) -> Iterator[Mob]:
             # unnecessary token access (and undesired indentation)
             return
     except KeyError as err:
-        raise ValueError from err
+        raise ValueError("DEVELOPER: Expected paging object") from err
     page = page_zero
     header = get_header(auth.get_access_token())
     while nexturl := page['next']:
@@ -144,28 +144,30 @@ def mob_in_mob(api: Spotify, obj: Mob, lst: Mob) -> bool:
 
     TODO doctests here
 
-    Episodes and non-mobs match nothing, but throw no error.
+    Episodes match nothing, but throw no error.
 
     TODO that especially needs doctesting
     """
-    if obj['uri'] == lst['uri']:
+    if obj.get('uri', None) == lst.get('uri', False):
         return True
     if test := _MOB_SPECIFIC_TESTS.get(obj['type']):
         return test(api.auth_manager, obj, lst)
     return False
 
 
-def iter_mob(auth: SpotifyPKCE, mob: Mob) -> Iterator[str]:
+def iter_mob(auth: SpotifyPKCE, mob: Mob,
+             keep_local: bool = True) -> Iterator[str]:
     if objects := mob.get('objects'):
         for obj in objects:
-            yield from iter_mob(auth, obj)
+            yield from iter_mob(auth, obj, keep_local)
+        return
     if tracks := mob.get('tracks', mob.get('episodes')):
         mob_tracks = results_generator(auth, tracks)
     else:
         mob_tracks = [mob]
-    if mob['type'] == 'playlist':
-        mob_tracks = (t['track'] for t in mob_tracks)
-    yield from (t['uri'] for t in mob_tracks)
+    mob_tracks = (t.get('track', t) for t in mob_tracks)
+    yield from (t['uri'] for t in mob_tracks
+                if keep_local or t.get('uri', '').startswith('spotify:track:'))
 
 
 def mob_eq(mob1: Mob, mob2: Mob) -> bool:
