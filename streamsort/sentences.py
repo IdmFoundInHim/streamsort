@@ -144,6 +144,11 @@ def ss_remove(subject: State, query: Query) -> State:
 
 
 def ss_play(subject: State, query: Query) -> State:
+    """ Play the queried mob 
+    
+    The query will be played in the context of the subject if valid.
+    SS Objects will be deconstructed recursively.
+    """
     to_play = ss_open(subject, query).mob
     if (subject.mob['type'] in ['playlist', 'album', 'show']
             and mob_in_mob(subject.api, to_play, subject.mob)):
@@ -156,11 +161,37 @@ def ss_play(subject: State, query: Query) -> State:
 
 
 def ss_all(subject: State, query: Query) -> State:
-    return ss_open(subject, query)
+    """ Open an empty, playlist-like SS Object
+    
+    Fills in a value for most keys in a Spotify PlaylistObject,
+    excluding online-dependent ones. The new object will be named after
+    the query.
+    """
+    ss_object = Mob(frozendict(
+        name=str_mob(query) if isinstance(query, Mapping) else query,
+        owner=subject.api.me(),
+        # Static:
+        collaborative=False,
+        description=None,
+        images=(),
+        public=None,
+        snapshot_id=Ellipsis,  # This key could be helpful at some point
+        objects=[],
+        type='ss'
+    ))
+    return State(subject[0], ss_object, subject[2])
 
 
 def ss_new(subject: State, query: Query) -> State:
-    return ss_open(subject, query)
+    """ Create a new playlist on Spotify for the current user
+    
+    The new playlist is private, and it is named after the query.
+    """
+    name = str_mob(query) if isinstance(query, Mapping) else query
+    playlist_id = cast(str, 
+        subject.api.user_playlist_create(cast(Mob, subject.api.me())['id'],
+            name, False))
+    return ss_open(subject, playlist_id)
 
 
 def _ss_open_process_query(query: str) -> TypeSpecificSearch:
