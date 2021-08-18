@@ -75,6 +75,7 @@ Implementation:
 __all__ = ['shell', 'process_line', 'login', 'logout']
 
 import os
+import itertools
 from collections.abc import Callable, Iterator, Mapping
 from typing import cast
 
@@ -155,47 +156,42 @@ QueryProcess = Callable[[State, Iterator[str], Mapping[str, Sentence]], Query]
 def process_line(state: State,
                  tokens: Iterator[str],
                  sentences: Mapping[str, Sentence]) -> tuple[Sentence, Query]:
-    reserved_control: dict[str | None, Processor | None] = {
+    reserved_control: dict[str | None, Processor] = {
         'in': _process_line_in,
         'after': process_line,
         'track': _process_line_track_load,
-        'nom': None,
+        'nom': lambda a, b, c: (_identity_state, Mob({})),
         None: lambda a, b, c: (_identity_state, Mob({}))
     }
     branch_control: dict[str | None, QueryProcess | str] = {
         'in': "Parameter may not start with 'in'. Perhaps use 'nom in'",
         'after': _process_line_after,
         'track': _process_line_track,
-        'nom': _process_line_nom,
-        None: "Missing Parameter"
+        'nom': _process_line_nom
     }
 
     token = next(tokens, None)
-    try:
-        if (processor := reserved_control.get(token, False)) is not False:
-            return cast(Processor, processor)(state, tokens, sentences)
-    except TypeError as err:
-        raise ValueError(f"Lines starting with '{token}' "
-                          "do nothing") from err
+    if (processor := reserved_control.get(token)):
+        return processor(state, tokens, sentences)
     if sentence := sentences.get(cast(str, token)):
-        token = next(tokens, None)
-        if control := branch_control.get(token):
+        tokens_t, branch_tokens = itertools.tee(tokens)
+        branch_token = next(branch_tokens, None)
+        if control := cast(QueryProcess, branch_control.get(branch_token)):
             try:
-                return (sentence, cast(QueryProcess, control)(state, tokens,
-                                                              sentences))
+                return (sentence, control(state, tokens, sentences))
             except TypeError as err:
                 raise ValueError(control) from err
-        return (sentence, cast(str, token) + ' ' + ' '.join(tokens))
+        return (sentence, ' '.join(tokens_t))
     if substate := state.subshells.get(cast(str, token)):
         subsh_name, token = token, next(tokens, None)
         if token:
             raise ValueError("Subshell loading does not take a parameter. "
                              f"Perhaps use 'in {subsh_name}...")
         return ((lambda a, b: cast(State, substate)), '')
-    return _process_line_init_subsh(state, tokens, sentences, cast(str, token))
+    return _process_line_make_subsh(state, tokens, sentences, cast(str, token))
 
 
-def _process_line_init_subsh(state: State,
+def _process_line_make_subsh(state: State,
                              tokens: Iterator[str],
                              sentences: Mapping[str, Sentence],
                              new_subshell: str) -> tuple[Sentence, Query]:

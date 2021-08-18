@@ -92,13 +92,15 @@ def ss_open(subject: State, query: Query) -> State:
     to check with the user before finalizing the selection. Custom I/O
     functions may be supplied through `io_inject`.
     """
+    if not query:
+        return State(subject[0], cast(Mob, subject.api.me()))
     if isinstance(query, Mapping):
-        return State(subject.api, query)
+        return State(subject[0], query)
     search_query = cast(str, query)
     out = _ss_open_process_query(search_query)(subject, search_query)
     if out is None:
         raise NoResultsError
-    return State(subject.api, out, subject.subshells)
+    return State(subject[0], out, subject[2])
 
 
 def ss_add(subject: State, query: Query) -> State:
@@ -110,6 +112,9 @@ def ss_add(subject: State, query: Query) -> State:
     The subject will be returned, pointing to the same mob but updated
     as it will have changed.
     """
+    if not query:
+        # raise UnsupportedQueryError('"add" requires a query')
+        raise UnsupportedQueryError('add', '')
     if subject.mob['type'] == 'playlist':
         _ss_add_to_playlist(subject.api, subject.mob,
                             ss_open(subject, query).mob)
@@ -133,6 +138,9 @@ def ss_remove(subject: State, query: Query) -> State:
     The subject will be returned, pointing to the same mob but updated
     as it will have changed.
     """
+    if not query:
+        # raise UnsupportedQueryError('"remove" requires a query')
+        raise UnsupportedQueryError('remove', '')
     if subject.mob['type'] == 'playlist':
         _ss_remove_from_playlist(subject.api, subject.mob,
                                  ss_open(subject, query).mob)
@@ -151,6 +159,8 @@ def ss_play(subject: State, query: Query) -> State:
     The query will be played in the context of the subject if valid.
     SS Objects will be deconstructed recursively.
     """
+    if not query:
+        query = subject.mob
     to_play = ss_open(subject, query).mob
     if (subject.mob['type'] in ['playlist', 'album', 'show']
             and mob_in_mob(subject.api, to_play, subject.mob)):
@@ -169,6 +179,9 @@ def ss_all(subject: State, query: Query) -> State:
     excluding online-dependent ones. The new object will be named after
     the query.
     """
+    if not query:
+        # raise UnsupportedQueryError('"all" requires a query')
+        raise UnsupportedQueryError('all', '')
     ss_object = Mob(frozendict(
         name=str_mob(query) if isinstance(query, Mapping) else query,
         owner=subject.api.me(),
@@ -189,6 +202,9 @@ def ss_new(subject: State, query: Query) -> State:
     
     The new playlist is private, and it is named after the query.
     """
+    if not query:
+        # raise UnsupportedQueryError('"new" requires a query')
+        raise UnsupportedQueryError('new', '')
     name = str_mob(query) if isinstance(query, Mapping) else query
     playlist_id = cast(str, 
         subject.api.user_playlist_create(cast(Mob, subject.api.me())['id'],
