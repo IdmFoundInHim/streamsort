@@ -72,26 +72,55 @@ Implementation:
       3. branch: Watching for keywords, but otherwise acts like free
     * In reserved mode, non-reserved tokens are new subshell names
 """
+__all__ = ['shell', 'process_line', 'login', 'logout']
 
 import os
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Mapping
 from typing import cast
 
 from frozendict import frozendict
 from spotipy import Spotify, SpotifyException, SpotifyPKCE
 
-from .constants import CACHE_PATH, CLIENT_ID, REDIRECT_URI, SCOPE
+from ._constants import CACHE_PATH, CLIENT_ID, REDIRECT_URI, SCOPE
 from .errors import NoResultsError
-from .musictypes import Mob, State, str_mob
 from .sentences import ss_add, ss_all, ss_new, ss_open, ss_play, ss_remove
-from .utilities import results_generator
+from .types import Mob, Query, Sentence, State
+from .utilities import results_generator, str_mob
 
 SAFE = 0
 IDLE = 1
 WORK = 2
 
 
-def shell() -> int:
+def login() -> State:
+    """ Returns an authorized Spotify object and user details """
+    spotify = Spotify(auth_manager=SpotifyPKCE(client_id=CLIENT_ID,
+                                               redirect_uri=REDIRECT_URI,
+                                               cache_path=CACHE_PATH,
+                                               scope=SCOPE))
+    user = cast(Mob, spotify.me())
+    return State(spotify, user)
+
+
+def logout() -> int:
+    """ Removes cache, returning a truthy value only if removal fails
+    """
+    try:
+        os.remove(CACHE_PATH)
+        return 0
+    except OSError:
+        return 1
+
+
+def shell(extensions: dict[str, Sentence]) -> int:
+    sentences: frozendict[str, Sentence]= frozendict({'open': ss_open,
+                                                      'add': ss_add,
+                                                      'remove': ss_remove,
+                                                      'play': ss_play,
+                                                      'all': ss_all,
+                                                      'new': ss_new,
+                                                      'get': ss_open,
+                                                      **extensions})
     status = IDLE
     state = login()
     while (line := input(str_mob(state.mob) + ' > ')) != 'exit':
@@ -105,7 +134,8 @@ def shell() -> int:
                 state = login()
         else:
             try:
-                sentence, query = process_line(state, iter(line.split()))
+                sentence, query = process_line(state, iter(line.split()),
+                    sentences)
                 state = sentence(state, query)
             except NoResultsError:
                 print('    No Results')
@@ -118,27 +148,19 @@ def shell() -> int:
     return status
 
 
-Query = str | Mob
-Sentence = Callable[[State, Query], State]
-Processor = Callable[[State, Iterator[str]], tuple[Sentence, Query]]
-QueryProcess = Callable[[State, Iterator[str]], Query]
-SENTENCES: dict[str, Sentence] = {'open': ss_open,
-                                  'add': ss_add,
-                                  'remove': ss_remove,
-                                  'play': ss_play,
-                                  'all': ss_all,
-                                  'new': ss_new,
-                                  'get': ss_open,
-}
+Processor = Callable[[State, Iterator[str], Mapping[str, Sentence]],
+                     tuple[Sentence, Query]]
+QueryProcess = Callable[[State, Iterator[str], Mapping[str, Sentence]], Query]
 
 def process_line(state: State,
-                 tokens: Iterator[str]) -> tuple[Sentence, Query]:
+                 tokens: Iterator[str],
+                 sentences: Mapping[str, Sentence]) -> tuple[Sentence, Query]:
     reserved_control: dict[str | None, Processor | None] = {
         'in': _process_line_in,
         'after': process_line,
         'track': _process_line_track_load,
         'nom': None,
-        None: lambda a, b: (_identity_state, Mob({}))
+        None: lambda a, b, c: (_identity_state, Mob({}))
     }
     branch_control: dict[str | None, QueryProcess | str] = {
         'in': "Parameter may not start with 'in'. Perhaps use 'nom in'",
@@ -151,15 +173,16 @@ def process_line(state: State,
     token = next(tokens, None)
     try:
         if (processor := reserved_control.get(token, False)) is not False:
-            return cast(Processor, processor)(state, tokens)
+            return cast(Processor, processor)(state, tokens, sentences)
     except TypeError as err:
         raise ValueError(f"Lines starting with '{token}' "
                           "do nothing") from err
-    if sentence := SENTENCES.get(cast(str, token)):
+    if sentence := sentences.get(cast(str, token)):
         token = next(tokens, None)
         if control := branch_control.get(token):
             try:
-                return (sentence, cast(QueryProcess, control)(state, tokens))
+                return (sentence, cast(QueryProcess, control)(state, tokens,
+                                                              sentences))
             except TypeError as err:
                 raise ValueError(control) from err
         return (sentence, cast(str, token) + ' ' + ' '.join(tokens))
@@ -169,31 +192,35 @@ def process_line(state: State,
             raise ValueError("Subshell loading does not take a parameter. "
                              f"Perhaps use 'in {subsh_name}...")
         return ((lambda a, b: cast(State, substate)), '')
-    return _process_line_init_subsh(state, tokens, cast(str, token))
+    return _process_line_init_subsh(state, tokens, sentences, cast(str, token))
 
 
 def _process_line_init_subsh(state: State,
                              tokens: Iterator[str],
+                             sentences: Mapping[str, Sentence],
                              new_subshell: str) -> tuple[Sentence, Query]:
-    sentence, query = process_line(state, tokens)
+    sentence, query = process_line(state, tokens, sentences)
     return (_set_subshell(new_subshell, sentence(state, query)), Mob({}))
 
 
 def _process_line_in(state: State,
-                     tokens: Iterator[str]) -> tuple[Sentence, Query]:
+                     tokens: Iterator[str],
+                     sentences: Mapping[str, Sentence]) -> tuple[Sentence, Query]:
     try:
         subsh = next(tokens)
     except StopIteration as err:
         raise ValueError("Missing subshell name after 'in'") from err
     try:
-        sentence, query = process_line(state, tokens)
+        sentence, query = process_line(state, tokens, sentences)
         return (_set_subshell(subsh, sentence(state[2][subsh], query)),
                 Mob({}))
     except KeyError as err:
         raise ValueError("Invalid subshell name after 'in'") from err
 
 
-def _process_line_track(state: State, tokens: Iterator[str]) -> Mob:
+def _process_line_track(state: State, tokens: Iterator[str],
+                        sentences: Mapping[str, Sentence]) -> Mob:
+    del sentences
     track_num = next(tokens)
     try:
         track_num = int(track_num)
@@ -224,19 +251,22 @@ def _process_line_track(state: State, tokens: Iterator[str]) -> Mob:
 
 
 def _process_line_track_load(state: State,
-                             tokens: Iterator[str]) -> tuple[Sentence, Query]:
-    mob = _process_line_track(state, tokens)
+                             tokens: Iterator[str],
+                             sentences: Mapping[str, Sentence]) -> tuple[Sentence, Query]:
+    mob = _process_line_track(state, tokens, sentences)
     new_state = State(state[0], mob, state[2])
     return ((lambda a, b: new_state), '')
 
 
-def _process_line_after(state: State, tokens: Iterator[str]) -> Mob:
-    subject, query = process_line(state, tokens)
+def _process_line_after(state: State, tokens: Iterator[str],
+                        sentences: Mapping[str, Sentence]) -> Mob:
+    subject, query = process_line(state, tokens, sentences)
     return subject(state, query).mob
 
 
-def _process_line_nom(state: State, tokens: Iterator[str]) -> str:
-    del state
+def _process_line_nom(state: State, tokens: Iterator[str],
+                      sentences: Mapping[str, Sentence]) -> str:
+    del state, sentences
     return ' '.join(tokens)
 
 
@@ -254,23 +284,3 @@ def _set_subshell(subsh_name: str, subsh_state: State) -> Sentence:
 def _identity_state(state: State, query: Query) -> State:
     del query
     return state
-
-
-def login() -> State:
-    """ Returns an authorized Spotify object and user details """
-    spotify = Spotify(auth_manager=SpotifyPKCE(client_id=CLIENT_ID,
-                                               redirect_uri=REDIRECT_URI,
-                                               cache_path=CACHE_PATH,
-                                               scope=SCOPE))
-    user = cast(Mob, spotify.me())
-    return State(spotify, user)
-
-
-def logout() -> int:
-    """ Removes cache, returning a truthy value only if removal fails
-    """
-    try:
-        os.remove(CACHE_PATH)
-        return 0
-    except OSError:
-        return 1

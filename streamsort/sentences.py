@@ -2,6 +2,9 @@
 
 Copyright (c) 2021 IdmFoundInHim, under MIT License
 """
+__all__ = ['io_inject', 'ss_add', 'ss_all', 'ss_new', 'ss_open', 'ss_play',
+    'ss_remove']
+
 from collections.abc import Callable, Iterator, Mapping
 from itertools import tee
 from typing import cast
@@ -10,15 +13,14 @@ from frozendict import frozendict
 from more_itertools import chunked, roundrobin
 from spotipy import Spotify, SpotifyPKCE
 
-from .cache import liked_songs_cache_check
-from .constants import MOB_GET_FUNCTIONS, MOBNAMES, NUMSUGGESTIONS
+from ._cache import liked_songs_cache_check
+from ._constants import MOB_GET_FUNCTIONS, MOBNAMES, NUMSUGGESTIONS
 from .errors import NoResultsError, UnsupportedQueryError, UnsupportedVerbError
-from .interaction import confirm_action, notify_user
-from .musictypes import Album, Artist, Mob, Playlist, State, Track, str_mob
-from .utilities import as_uri, iter_mob, mob_eq, mob_in_mob, results_generator
+from ._io import confirm_action, notify_user
+from .types import Album, Artist, Mob, Playlist, State, Track, Query
+from .utilities import as_uri, iter_mob, mob_eq, mob_in_mob, results_generator, str_mob
 
 LIMIT = 50
-Query = str | Mob
 TypeSpecificSearch = Callable[[State, str], Mob | None]
 MultipleChoiceFunction = Callable[[Iterator[Mob]], Mob | None]
 
@@ -455,7 +457,7 @@ def _ss_play_in_context(api: Spotify, context: Mob, to_play: Mob):
 
 
 if __name__ == "__main__":
-    from .sh import login
+    from ._sh import login
     sp, usr, _ = login()
     sub = (sp, None)
     io_inject(lambda x: True)

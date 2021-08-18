@@ -2,6 +2,8 @@
 
 Copyright (c) 2021 IdmFoundInHim, under MIT License
 """
+__all__ = ['NoResultsError', 'UnexpectedResponseException',
+    'UnsupportedQueryError', 'UnsupportedVerbError']
 
 class NoResultsError(ValueError):
     """ A Spotify search returned no results """

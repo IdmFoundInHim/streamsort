@@ -2,6 +2,10 @@
 
 Copyright (c) 2021 IdmFoundInHim, under MIT License
 """
+__all__ = ['CLIENT_ID', 'REDIRECT_URI', 'CACHE_DIR', 'CACHE_PATH',
+    'MOB_URI_PREFIX', 'MOB_URL_PREFIX', 'SPID_VALID_CHARS', 'SPID_VALID_CHARS',
+    'MOBNAMES', 'MOB_GET_FUNCTIONS', 'NUMSUGGESTIONS', 'SCOPE']
+
 import os
 import string
 
@@ -28,3 +32,4 @@ NUMSUGGESTIONS = 3
 SCOPE = ('user-library-read user-follow-read playlist-read-private '
          + 'playlist-modify-private playlist-modify-public '
          + 'user-modify-playback-state')
+EXTENSION_ATTRIBUTE = '_sentences_'

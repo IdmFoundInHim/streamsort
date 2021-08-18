@@ -2,6 +2,7 @@
 
 Copyright (c) 2021 IdmFoundInHim, under MIT License
 """
+__all__ = ['liked_songs_cache_check']
 
 import json
 from collections.abc import Mapping

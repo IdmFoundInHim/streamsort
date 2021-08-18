@@ -2,6 +2,8 @@
 
 Copyright (c) 2020 IdmFoundInHim, except where otherwise credited
 """
+__all__ = ['as_uri', 'get_header', 'iter_mob', 'mob_eq', 'mob_in_mob',
+    'results_generator', 'str_mob']
 
 from collections.abc import Iterator, Mapping
 from urllib import parse as urlparse
@@ -10,9 +12,9 @@ from more_itertools import flatten
 import requests
 from spotipy import Spotify, SpotifyPKCE
 
-from .constants import (MOBNAMES, MOB_URI_PREFIX, MOB_URL_PREFIX,
+from ._constants import (MOBNAMES, MOB_URI_PREFIX, MOB_URL_PREFIX,
                         SPID_VALID_CHARS)
-from .musictypes import Mob
+from .types import Mob
 
 def get_header(oauth: str) -> dict:
     """ Returns header with given oauth for the Spotify API """
@@ -178,14 +180,38 @@ def iter_mob(auth: SpotifyPKCE, mob: Mob,
                 if keep_local or t.get('uri', '').startswith('spotify:track:'))
 
 
+_MOB_STRS = {
+    'track': '"{}" by {}{}',
+    'album': '*{}* by {}, {} songs',
+    'artist': '{}{}{}',
+    'playlist': '{}, {}{} songs',
+    'episode': '"{}" from *{}{}*',
+    'show': '*{}* from {}{}',
+    'user': '@{}{}{}',
+    'ss': ':{}{}{}'
+}
+
+
+def str_mob(mob: Mob):
+    """ Constructs display string of given Mob (dict) """
+    mob_fields = [mob.get('name', mob.get('display_name')),
+                  mob['artists'][0]['name'] if mob.get('artists')
+                    else mob.get('show', mob.get('publisher', '')),
+                  mob.get('total_tracks')
+                    or mob['tracks']['total'] if mob.get('tracks')
+                    else mob['episodes']['total'] if mob.get('episodes')
+                    else '']
+    return _MOB_STRS[mob['type']].format(*mob_fields)
+
+
 def mob_eq(mob1: Mob, mob2: Mob) -> bool:
     try:
         return mob1['uri'] == mob2['uri']
     except KeyError:
-        return ss_eq(mob1, mob2)
+        return _ss_eq(mob1, mob2)
 
 
-def ss_eq(ss1: Mob, ss2: Mob) -> bool:
+def _ss_eq(ss1: Mob, ss2: Mob) -> bool:
     try:
         ss1_objects, ss2_objects = ss1['objects'], ss2['objects']
     except KeyError as err:
@@ -195,7 +221,7 @@ def ss_eq(ss1: Mob, ss2: Mob) -> bool:
             if uri not in (o.get('uri') for o in ss2_objects):
                 return False
         elif obj.get('objects'):
-            if not any(ss_eq(obj, o) for o in ss2_objects if o.get('objects')):
+            if not any(_ss_eq(obj, o) for o in ss2_objects if o.get('objects')):
                 return False
         else:
             raise ValueError("DEVELOPER: SS Object contained invalid objects")
