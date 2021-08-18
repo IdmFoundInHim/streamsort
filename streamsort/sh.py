@@ -150,12 +150,11 @@ def process_line(state: State,
 
     token = next(tokens, None)
     try:
-        return cast(Processor, reserved_control[token])(state, tokens)
+        if (processor := reserved_control.get(token, False)) is not False:
+            return cast(Processor, processor)(state, tokens)
     except TypeError as err:
         raise ValueError(f"Lines starting with '{token}' "
                           "do nothing") from err
-    except KeyError:
-        pass
     if sentence := SENTENCES.get(cast(str, token)):
         token = next(tokens, None)
         if control := branch_control.get(token):
