@@ -24,7 +24,15 @@ def get_header(oauth: str) -> dict:
 
 
 def results_generator(auth: SpotifyPKCE, page_zero: Mapping) -> Iterator[Mob]:
-    """ Cycles through multi-page responses from Spotify """
+    """ Iterates over multi-page responses from Spotify 
+    
+    If items are being removed or reordered, convert to a list or set.
+    Otherwise, songs will be skipped. (The iterator makes API requests
+    lazily, always moving the offset by 100. If items are removed before
+    the next request is made, the next unused item may be in a position
+    less than +100, but the iterator will still get whatever item is in
+    position +100.)
+    """
     try:
         yield from page_zero['items']
         if not page_zero['next']:

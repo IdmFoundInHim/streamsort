@@ -427,10 +427,11 @@ def _ss_add_to_ss(ss_obj: Mob, new_mob: Mob) -> Mob:
 def _ss_remove_from_playlist(api: Spotify, destination: Mob, target: Mob):
     if target['type'] == 'artist':
         raise UnsupportedQueryError('remove', str_mob(target))
-    target_items = chunked(iter_mob(cast(SpotifyPKCE, api.auth_manager),
-                                    target), # May need keep_local=False
-                           100)
-    for item_group in target_items:
+    # Cannot remove local items
+    # See https://github.com/plamere/spotipy/issues/524
+    target_items = chunked(set(iter_mob(cast(SpotifyPKCE, api.auth_manager),
+                                        target, keep_local=False)), 100)
+    for item_group in target_items: # Skipping items -1 and sometimes -2
         api.playlist_remove_all_occurrences_of_items(destination['id'],
                                                      item_group)
 
