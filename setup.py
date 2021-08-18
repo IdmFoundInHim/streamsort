@@ -5,7 +5,7 @@ with open('README.md', 'r') as fh:
 
 setuptools.setup(
     name='streamsort',
-    version='0.0.1a0',
+    version='0.0.2a0',
     author='IdmFoundInHim',
     author_email='idmfoundinhim@gmail.com',
     description='Power tools for your playlists',
@@ -20,7 +20,7 @@ setuptools.setup(
         'Development Status :: 2 - Pre-Alpha',
         'Natural Language :: English',
         'Topic :: Multimedia :: Sound/Audio',
-        'Typing :: Typed'
+        'Typing :: Typed',
     ],
     keywords='playlists music backup shuffle',
     python_requires='>=3.10',
