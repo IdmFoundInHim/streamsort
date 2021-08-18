@@ -232,7 +232,7 @@ def _ss_open_general(subject: State, query: str) -> Mob | None:
                for x in MOBNAMES}
     for result_gens in roundrobin(*[zip(*[results[t] for t in mobtypes])
                                     for mobtypes
-                                    in [MOBNAMES[:-1], MOBNAMES[-1:]]]):
+                                    in [MOBNAMES[-1:], MOBNAMES[:-1]]]):
         # Current result_gens: Iterable[Iterator[Iterator[Mob]]]
         # Desired result_gens: Iterable[Iterator[Mob]]
         # priority_results: Iterator[Mob]
@@ -376,7 +376,7 @@ def _ss_open_familiar(subject: State, results: dict,
                        api.current_user_following_artists(a['id'] for a
                                                           in r.get('artists',
                                                                    [r])
-           )      )     )                                 )
+           )      )     )                                 ) # slow(est)
     liked_songs = liked_songs_cache_check(api)
     yield (r for r in results_generator(auth, results)
            if r['id'] in liked_songs[mobname])
