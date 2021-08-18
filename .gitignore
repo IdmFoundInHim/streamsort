@@ -1,5 +1,25 @@
+# Byte-compiled / optimized / DLL files
 __pycache__/
-streamsort.egg-info/
+*.py[cod]
+
+# Distribution / packaging
+bin/
+build/
+develop-eggs/
+dist/
+eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Thank you to GitHub!
+# https://github.com/github/gitignore/blob/master/Python.gitignore
+
 env/
 
 .cache/
