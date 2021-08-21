@@ -10,8 +10,8 @@ the extension.
 # pyright: reportUnsupportedDunderAll=false
 from .sentences import __all__ as sentences__all__
 
-__all__ = ['_sentences_'] + sentences__all__
+__all__ = ["_sentences_"] + sentences__all__
 
 from .sentences import *
 
-_sentences_ = {'projects': proj_projects}
+_sentences_ = {"projects": proj_projects}

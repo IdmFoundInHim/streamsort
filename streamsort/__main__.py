@@ -18,8 +18,9 @@ if CACHE_DIR not in os.listdir():
     os.makedirs(CACHE_DIR)
 
 extension_sentences = {}
-for extension in more_itertools.lstrip(sys.argv, lambda a: '__main__.py' in a):
-    extension_sentences |= (import_module(extension)
-                            .__dict__[EXTENSION_ATTRIBUTE])
+for extension in more_itertools.lstrip(sys.argv, lambda a: "__main__.py" in a):
+    extension_sentences |= import_module(extension).__dict__[
+        EXTENSION_ATTRIBUTE
+    ]
 
 sys.exit(shell(extension_sentences))

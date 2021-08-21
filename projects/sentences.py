@@ -2,7 +2,7 @@
 
 Copyright (c) 2021 IdmFoundInHim, under MIT License
 """
-__all__ = ['proj_projects']
+__all__ = ["proj_projects"]
 
 from streamsort.types import Query, State
 

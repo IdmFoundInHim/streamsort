@@ -2,18 +2,25 @@
 
 Copyright (c) 2021 IdmFoundInHim, under MIT License
 """
-__all__ = ['shuf_shuffle']
+__all__ = ["shuf_shuffle"]
 
 import random
 
-from streamsort import (UnsupportedQueryError, UnsupportedVerbError,
-                        results_generator, ss_add, ss_new, ss_open, ss_remove,
-                        str_mob)
+from streamsort import (
+    UnsupportedQueryError,
+    UnsupportedVerbError,
+    results_generator,
+    ss_add,
+    ss_new,
+    ss_open,
+    ss_remove,
+    str_mob,
+)
 from streamsort.types import Mob, Query, State
 
 
 def shuf_shuffle(subject: State, query: Query):
-    """ (ALPHA: Behavior subject to change) Shuffle a list of mobs
+    """(ALPHA: Behavior subject to change) Shuffle a list of mobs
 
     Currently uploads result of shuffling the subject to the queried
     playlist.
@@ -22,14 +29,14 @@ def shuf_shuffle(subject: State, query: Query):
     of tracks to stay together depending on the construction of the
     subject.
     """
-    verb_error = UnsupportedVerbError(str_mob(subject.mob), 'shuffle')
-    query_error = UnsupportedQueryError('shuffle',
-                                        query if isinstance(query, str)
-                                        else str_mob(query))
+    verb_error = UnsupportedVerbError(str_mob(subject.mob), "shuffle")
+    query_error = UnsupportedQueryError(
+        "shuffle", query if isinstance(query, str) else str_mob(query)
+    )
     try:
         if not query:
             query = subject.mob
-            subject = ss_new(subject, 'Shuffled: ' + subject.mob['name'])
+            subject = ss_new(subject, "Shuffled: " + subject.mob["name"])
         else:
             query = ss_open(subject, query).mob
     except KeyError:
@@ -37,17 +44,20 @@ def shuf_shuffle(subject: State, query: Query):
         # raise UnsupportedQueryError('The query was empty and the subject '
         #                             'was not list-like'
     try:
-        playlist = list(results_generator(subject.api.auth_manager,
-            query.get('tracks') or query['objects']
-        ))
+        playlist = list(
+            results_generator(
+                subject.api.auth_manager,
+                query.get("tracks") or query["objects"],
+            )
+        )
     except KeyError:
         raise query_error
         # raise UnsupportedQueryError('The query was not list-like')
     random.shuffle(playlist)
     try:
         ss_remove(subject, subject.mob)
-        ss_add(subject, Mob({'objects': playlist, 'type': 'ss'}))
+        ss_add(subject, Mob({"objects": playlist, "type": "ss"}))
     except UnsupportedVerbError as err:
         raise verb_error from err
         # raise UnsupportedVerbError('The subject was not editable') from err
-    return ss_open(subject, subject.mob['uri'])
+    return ss_open(subject, subject.mob["uri"])
