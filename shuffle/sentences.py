@@ -5,11 +5,12 @@ Copyright (c) 2021 IdmFoundInHim, under MIT License
 __all__ = ["shuf_shuffle"]
 
 import random
+from streamsort.utilities import results_generator
 
 from streamsort import (
     UnsupportedQueryError,
     UnsupportedVerbError,
-    results_generator,
+    iter_mob,
     ss_add,
     ss_new,
     ss_open,
@@ -44,12 +45,12 @@ def shuf_shuffle(subject: State, query: Query):
         # raise UnsupportedQueryError('The query was empty and the subject '
         #                             'was not list-like'
     try:
-        playlist = list(
-            results_generator(
-                subject.api.auth_manager,
-                query.get("tracks") or query["objects"],
+        if query.get("tracks"):
+            playlist = list(
+                results_generator(subject.api.auth_manager, query["tracks"])
             )
-        )
+        else:
+            playlist = query["objects"]
     except KeyError:
         raise query_error
         # raise UnsupportedQueryError('The query was not list-like')
