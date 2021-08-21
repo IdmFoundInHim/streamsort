@@ -155,7 +155,7 @@ def shell(extensions: dict[str, Sentence]) -> int:
                 print(f"    ERROR: {err.args[0]}")
             except requests.exceptions.ConnectionError:
                 print("    ERROR: Connection was lost. Reconnecting...")
-                state.api = login().api
+                state = State(login().api, state[1], state[2])
         status = IDLE
     status = SAFE
     return status
