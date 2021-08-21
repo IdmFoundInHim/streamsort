@@ -80,6 +80,7 @@ from collections.abc import Callable, Iterator, Mapping
 from typing import cast
 
 from frozendict import frozendict
+import requests.exceptions
 from spotipy import Spotify, SpotifyException, SpotifyPKCE
 
 from ._constants import CACHE_PATH, CLIENT_ID, REDIRECT_URI, SCOPE
@@ -152,6 +153,9 @@ def shell(extensions: dict[str, Sentence]) -> int:
                 print("    ERROR: The Spotify operation failed")
             except ValueError as err:
                 print(f"    ERROR: {err.args[0]}")
+            except requests.exceptions.ConnectionError:
+                print("    ERROR: Connection was lost. Reconnecting...")
+                state.api = login().api
         status = IDLE
     status = SAFE
     return status
