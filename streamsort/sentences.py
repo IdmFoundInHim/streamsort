@@ -27,7 +27,7 @@ from ._io import confirm_action, notify_user
 from .types import Album, Artist, Mob, Playlist, State, Track, Query
 from .utilities import (
     as_uri,
-    iter_mob,
+    iter_mob_uri,
     mob_eq,
     mob_in_mob,
     results_generator,
@@ -188,7 +188,7 @@ def ss_play(subject: State, query: Query) -> State:
         _ss_play_in_context(subject.api, subject.mob, to_play)
     else:
         uri_list = list(
-            iter_mob(cast(SpotifyPKCE, subject.api.auth_manager), to_play)
+            iter_mob_uri(cast(SpotifyPKCE, subject.api.auth_manager), to_play)
         )
         subject.api.start_playback(uris=uri_list)
     return subject
@@ -493,7 +493,7 @@ def _ss_add_to_playlist(api: Spotify, destination: Mob, target: Mob):
     if target["type"] == "artist":
         raise UnsupportedQueryError("add", str_mob(target))
     target_items = chunked(
-        iter_mob(
+        iter_mob_uri(
             cast(SpotifyPKCE, api.auth_manager), target, keep_local=False
         ),
         100,
@@ -520,7 +520,7 @@ def _ss_remove_from_playlist(api: Spotify, destination: Mob, target: Mob):
     # See https://github.com/plamere/spotipy/issues/524
     target_items = chunked(
         set(
-            iter_mob(
+            iter_mob_uri(
                 cast(SpotifyPKCE, api.auth_manager), target, keep_local=False
             )
         ),

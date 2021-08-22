@@ -5,7 +5,8 @@ Copyright (c) 2020 IdmFoundInHim, except where otherwise credited
 __all__ = [
     "as_uri",
     "get_header",
-    "iter_mob",
+    "iter_mob_uri",
+    "iter_mob_track",
     "mob_eq",
     "mob_in_mob",
     "results_generator",
@@ -13,6 +14,7 @@ __all__ = [
 ]
 
 from collections.abc import Iterator, Mapping
+from typing import cast
 from urllib import parse as urlparse
 
 from more_itertools import flatten
@@ -25,7 +27,7 @@ from ._constants import (
     MOB_URL_PREFIX,
     SPID_VALID_CHARS,
 )
-from .types import Mob
+from .types import Mob, Track
 
 
 def get_header(oauth: str) -> dict:
@@ -185,12 +187,16 @@ def mob_in_mob(api: Spotify, obj: Mob, lst: Mob) -> bool:
     return False
 
 
-def iter_mob(
+def iter_mob_uri(
     auth: SpotifyPKCE, mob: Mob, keep_local: bool = True
 ) -> Iterator[str]:
+    return (t['uri'] for t in iter_mob_track(auth, mob, keep_local))
+
+
+def iter_mob_track(auth: SpotifyPKCE, mob: Mob, keep_local: bool = True) -> Iterator[Track]:
     if objects := mob.get("objects"):
         for obj in objects:
-            yield from iter_mob(auth, obj, keep_local)
+            yield from iter_mob_track(auth, obj, keep_local)
         return
     if tracks := mob.get("tracks", mob.get("episodes")):
         mob_tracks = results_generator(auth, tracks)
@@ -198,7 +204,7 @@ def iter_mob(
         mob_tracks = [mob]
     mob_tracks = (t.get("track", t) for t in mob_tracks)
     yield from (
-        t["uri"]
+        cast(Track, t)
         for t in mob_tracks
         if keep_local or t.get("uri", "").startswith("spotify:track:")
     )

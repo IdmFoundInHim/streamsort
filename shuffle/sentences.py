@@ -10,7 +10,6 @@ from streamsort.utilities import results_generator
 from streamsort import (
     UnsupportedQueryError,
     UnsupportedVerbError,
-    iter_mob,
     ss_add,
     ss_new,
     ss_open,
