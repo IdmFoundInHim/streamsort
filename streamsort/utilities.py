@@ -47,7 +47,9 @@ def results_generator(auth: SpotifyPKCE, page_zero: Mapping) -> Iterator[Mob]:
     lazily, always moving the offset by 100. If items are removed before
     the next request is made, the next unused item may be in a position
     less than +100, but the iterator will still get whatever item is in
-    position +100.)
+    position +100.) Also convert to a list or set if items are being
+    added because certain usages (e.g. adding large playlist to itself)
+    will result in an infinite loop.
     """
     try:
         yield from page_zero["items"]
@@ -167,7 +169,7 @@ _MOB_SPECIFIC_TESTS = {
 def mob_in_mob(api: Spotify, obj: Mob, lst: Mob) -> bool:
     """Check if a mob is found in another mob
 
-    All items contain themselves in addition to anything else.
+    All items at least contain themselves.
     Albums are considered to contain their tracks + any
     artists credited on those tracks. Artists are considered to contain
     any tracks they are credited on + any albums or playlists
@@ -190,10 +192,12 @@ def mob_in_mob(api: Spotify, obj: Mob, lst: Mob) -> bool:
 def iter_mob_uri(
     auth: SpotifyPKCE, mob: Mob, keep_local: bool = True
 ) -> Iterator[str]:
-    return (t['uri'] for t in iter_mob_track(auth, mob, keep_local))
+    return (t["uri"] for t in iter_mob_track(auth, mob, keep_local))
 
 
-def iter_mob_track(auth: SpotifyPKCE, mob: Mob, keep_local: bool = True) -> Iterator[Track]:
+def iter_mob_track(
+    auth: SpotifyPKCE, mob: Mob, keep_local: bool = True
+) -> Iterator[Track]:
     if objects := mob.get("objects"):
         for obj in objects:
             yield from iter_mob_track(auth, obj, keep_local)

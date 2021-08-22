@@ -493,8 +493,10 @@ def _ss_add_to_playlist(api: Spotify, destination: Mob, target: Mob):
     if target["type"] == "artist":
         raise UnsupportedQueryError("add", str_mob(target))
     target_items = chunked(
-        iter_mob_uri(
-            cast(SpotifyPKCE, api.auth_manager), target, keep_local=False
+        list(  # Prevents infinite loop on self-add
+            iter_mob_uri(
+                cast(SpotifyPKCE, api.auth_manager), target, keep_local=False
+            )
         ),
         100,
     )
@@ -526,7 +528,7 @@ def _ss_remove_from_playlist(api: Spotify, destination: Mob, target: Mob):
         ),
         100,
     )
-    for item_group in target_items:  # Skipping items -1 and sometimes -2
+    for item_group in target_items:
         api.playlist_remove_all_occurrences_of_items(
             destination["id"], item_group
         )
