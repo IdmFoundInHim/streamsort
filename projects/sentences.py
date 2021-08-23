@@ -16,6 +16,7 @@ from streamsort.types import Mob, Query, State
 
 
 def proj_projects(subject: State, query: Query) -> State:
+    """Split a list-like mob by release format (album/single)"""
     if not query:
         query = subject.mob
     api = subject.api

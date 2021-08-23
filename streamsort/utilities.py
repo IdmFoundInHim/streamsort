@@ -192,12 +192,14 @@ def mob_in_mob(api: Spotify, obj: Mob, lst: Mob) -> bool:
 def iter_mob_uri(
     auth: SpotifyPKCE, mob: Mob, keep_local: bool = True
 ) -> Iterator[str]:
+    """Iterate over a mob's contained track uris (recursively)"""
     return (t["uri"] for t in iter_mob_track(auth, mob, keep_local))
 
 
 def iter_mob_track(
     auth: SpotifyPKCE, mob: Mob, keep_local: bool = True
 ) -> Iterator[Track]:
+    """Iterate over a mob's contained tracks (recursively)"""
     if objects := mob.get("objects"):
         for obj in objects:
             yield from iter_mob_track(auth, obj, keep_local)
@@ -243,6 +245,7 @@ def str_mob(mob: Mob):
 
 
 def mob_eq(mob1: Mob, mob2: Mob) -> bool:
+    """Check if two mobs have the same uri (or objects if no uris)"""
     try:
         return mob1["uri"] == mob2["uri"]
     except KeyError:
