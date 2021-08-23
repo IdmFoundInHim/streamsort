@@ -6,13 +6,18 @@ __all__ = ["proj_projects"]
 
 from collections.abc import Iterable
 from typing import Sequence, cast
-from streamsort import results_generator
-from .utilities import categorize_projects, single_in_album
 
 from frozendict import frozendict
 from spotipy import Spotify
-from streamsort import iter_mob_track, ss_open
+from streamsort import (
+    SimplifiedObjectError,
+    iter_mob_track,
+    results_generator,
+    ss_open,
+)
 from streamsort.types import Mob, Query, State
+
+from .utilities import categorize_projects, single_in_album
 
 
 def proj_projects(subject: State, query: Query) -> State:
@@ -23,7 +28,12 @@ def proj_projects(subject: State, query: Query) -> State:
     query_mob = ss_open(subject, query).mob
     print('    NOTE: "projects" may take a while')
     tracks = iter_mob_track(api.auth_manager, query_mob)
-    projects_prefilter = _proj_projects_divide(tracks)
+    try:
+        projects_prefilter = _proj_projects_divide(tracks)
+    except SimplifiedObjectError:
+        projects_prefilter = _proj_projects_divide(
+            cast(Mob, subject.api.track(t["uri"])) for t in tracks
+        )
     projects = _proj_projects_filter_singles(subject.api, projects_prefilter)
     out_mob = {
         "type": "ss",
@@ -36,7 +46,10 @@ def proj_projects(subject: State, query: Query) -> State:
 def _proj_projects_divide(tracks: Iterable[Mob]) -> list[dict]:
     albums = {}
     for track in tracks:
-        album_id: str = track["album"]["id"]
+        try:
+            album_id: str = track["album"]["id"]
+        except KeyError:
+            raise SimplifiedObjectError
         if existing_album := albums.get(album_id):
             albums[album_id]["objects"] = existing_album["objects"] + [track]
         else:
@@ -54,19 +67,30 @@ def _proj_projects_filter_singles(
     api: Spotify, projects: Sequence[dict]
 ) -> list[Mob]:
     for project in projects:
+        # Remove duplicates and put in order
         project_ids = [t["id"] for t in project["objects"]]
-        if len(project["objects"]) != len(
-            set(t["uri"] for t in project["objects"])
-        ):
-            # Remove duplicates, ensuring that project ends up in order
+        # Adding the following check assumes that projects are in order.
+        # It speeds up processing of playlists with few duplicates (that
+        # is, most practical use cases) by ~20x. This optimization has
+        # been excluded for potential usage on shuffled lists.
+        # --------------------------------------------------------------
+        # if len(project["objects"]) != len(
+        #     set(t["uri"] for t in project["objects"])
+        # ):
+        try:
             project["objects"] = [
                 t
                 for t in results_generator(
                     api.auth_manager,
-                    cast(str, api.album_tracks(project["root_album"]["id"])),
+                    cast(
+                        dict,
+                        api.album_tracks(project["root_album"]["uri"]),
+                    ),
                 )
                 if t["id"] in project_ids
             ]
+        except AttributeError:
+            pass
     project_list, singles, albums = categorize_projects(projects)
     for single in singles:
         for album in albums:

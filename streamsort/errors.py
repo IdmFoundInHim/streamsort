@@ -7,6 +7,7 @@ __all__ = [
     "UnexpectedResponseException",
     "UnsupportedQueryError",
     "UnsupportedVerbError",
+    "SimplifiedObjectError",
 ]
 
 
@@ -35,3 +36,7 @@ class UnsupportedQueryError(ValueError):
 
 class UnexpectedResponseException(Exception):
     """Spotify returned an object with an unfamiliar format"""
+
+
+class SimplifiedObjectError(ValueError):
+    """Intenal Error: Got simplified object where not permitted"""
