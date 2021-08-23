@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="streamsort",
-    version="0.0.2a0",
+    version="0.0.2",
     author="IdmFoundInHim",
     author_email="idmfoundinhim@gmail.com",
     description="Power tools for your playlists",
@@ -17,7 +17,7 @@ setuptools.setup(
         "Programming Language :: Python :: 3.10",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
-        "Development Status :: 2 - Pre-Alpha",
+        "Development Status :: 3 - Alpha",
         "Natural Language :: English",
         "Topic :: Multimedia :: Sound/Audio",
         "Typing :: Typed",
