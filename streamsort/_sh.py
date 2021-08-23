@@ -87,7 +87,7 @@ from ._constants import CACHE_PATH, CLIENT_ID, REDIRECT_URI, SCOPE
 from .errors import NoResultsError
 from .sentences import ss_add, ss_all, ss_new, ss_open, ss_play, ss_remove
 from .types import Mob, Query, Sentence, State
-from .utilities import results_generator, str_mob
+from .utilities import iter_mob_track, results_generator, str_mob
 
 SAFE = 0
 IDLE = 1
@@ -262,15 +262,17 @@ def _process_line_track(
         track_nom = f"{track_num} {track_nom}".lower()
     track_obj = next(
         (
-            t.get("track", t)
-            for t in state.mob["tracks"]["items"]
-            if track_nom == t.get("track", t)["name"].lower()
+            t
+            for t in iter_mob_track(
+                cast(SpotifyPKCE, state.api.auth_manager), state.mob
+            )
+            if track_nom == t["name"].lower()
         ),
         None,
     )
     if not track_obj:
         raise ValueError(f"Track {track_nom} was not found")
-    return cast(Mob, state.api.track(track_obj.get("track", track_obj)["id"]))
+    return cast(Mob, state.api.track(track_obj["id"]))
 
 
 def _process_line_track_load(
