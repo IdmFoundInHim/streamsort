@@ -4,70 +4,71 @@ Copyright (c) 2021 IdmFoundInHim, under MIT License
 """
 __all__ = ["proj_projects"]
 
-from typing import cast
+from collections.abc import Iterable
+from typing import Sequence, cast
+from streamsort import results_generator
+from .utilities import categorize_projects, single_in_album
 
 from frozendict import frozendict
-from streamsort import iter_mob, results_generator, ss_open
+from spotipy import Spotify
+from streamsort import iter_mob_track, ss_open
 from streamsort.types import Mob, Query, State
 
 
 def proj_projects(subject: State, query: Query) -> State:
+    if not query:
+        query = subject.mob
     api = subject.api
     query_mob = ss_open(subject, query).mob
     print('    NOTE: "projects" may take a while')
-    tracks = (
-        cast(dict, api.track(t)) for t in iter_mob(api.auth_manager, query_mob)
-    )
+    tracks = iter_mob_track(api.auth_manager, query_mob)
+    projects_prefilter = _proj_projects_divide(tracks)
+    projects = _proj_projects_filter_singles(subject.api, projects_prefilter)
+    out_mob = {
+        "type": "ss",
+        "name": f"Projects: {query_mob['name']}",
+        "objects": projects,
+    }  # needs 'details' key when display format is finalized
+    return State(api, Mob(frozendict(out_mob)), subject[2])
+
+
+def _proj_projects_divide(tracks: Iterable[Mob]) -> list[dict]:
     albums = {}
-    album_names = {}
     for track in tracks:
-        album_id = track["album"]["id"]
-        if not album_names.get(album_id):
-            album_names[album_id] = track["album"]["name"]
-        albums[album_id] = albums.get(album_id, []) + [track]
-    single_mappings = {}
-    for project in albums:
-        for track in albums[project]:
-            candidates = results_generator(
-                api.auth_manager,
-                cast(
-                    dict[str, dict],
-                    api.search(
-                        f"artist:{track['artists'][0]['name']} "
-                        f"track:{track['name']}",
-                        type="track",
-                    ),
-                )["tracks"],
-            )
-            single_mappings[project] = single_mappings.get(project, {})
-            single_mappings[project][track["id"]] = [
-                t["id"]
-                for t in candidates
-                if t["name"] == track["name"] and t["album"]["id"] != project
-            ]
-    projects = [
-        frozendict(
-            {
+        album_id: str = track["album"]["id"]
+        if existing_album := albums.get(album_id):
+            albums[album_id]["objects"] = existing_album["objects"] + [track]
+        else:
+            albums[album_id] = {
                 "type": "ss",
-                "name": album_names[k],
-                "objects": albums[k],
-                "singles": single_mappings[k],
-                "album_spotify_id": k,
-                "album_spotify_uri": f"spotify:album:{k}",
+                "name": track["album"]["name"],
+                "root_album": track["album"],
+                # Add? # 'artists': track['album']['artists']
+                "objects": [track],
             }
-        )
-        for k in albums
-    ]
-    return State(
-        api,
-        Mob(
-            frozendict(
-                {
-                    "type": "ss",
-                    "name": f"Projects: {query_mob['name']}",
-                    "objects": projects,
-                }
-            )
-        ),
-        subject[2],
-    )  # needs 'details' key when display format is finalized
+    return list(albums.values())
+
+
+def _proj_projects_filter_singles(
+    api: Spotify, projects: Sequence[dict]
+) -> list[Mob]:
+    for project in projects:
+        project_ids = [t["id"] for t in project["objects"]]
+        if len(project["objects"]) != len(
+            set(t["uri"] for t in project["objects"])
+        ):
+            # Remove duplicates, ensuring that project ends up in order
+            project["objects"] = [
+                t
+                for t in results_generator(
+                    api.auth_manager,
+                    cast(str, api.album_tracks(project["root_album"]["id"])),
+                )
+                if t["id"] in project_ids
+            ]
+    project_list, singles, albums = categorize_projects(projects)
+    for single in singles:
+        for album in albums:
+            if single_in_album(cast(Mob, single), cast(Mob, album)):
+                project_list.remove(single)
+    return [Mob(frozendict(d)) for d in project_list]
