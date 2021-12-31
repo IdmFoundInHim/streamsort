@@ -250,7 +250,7 @@ def _process_line_track(
             cast(SpotifyPKCE, state.api.auth_manager), state.mob["tracks"]
         )
         targeted_track_num = 1
-        while targeted_track_num != track_num and next(all_tracks, None):
+        while targeted_track_num != track_num and next(all_tracks, False):
             targeted_track_num += 1
         if targeted_track := next(all_tracks, None):
             targeted_track = targeted_track.get("track", targeted_track)["id"]

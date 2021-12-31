@@ -5,11 +5,13 @@ Copyright (c) 2021 IdmFoundInHim, under MIT License
 __all__ = ["shuf_shuffle"]
 
 import random
-from streamsort.utilities import results_generator
+from typing import cast
 
+from spotipy import SpotifyPKCE
 from streamsort import (
     UnsupportedQueryError,
     UnsupportedVerbError,
+    results_generator,
     ss_add,
     ss_new,
     ss_open,
@@ -46,7 +48,10 @@ def shuf_shuffle(subject: State, query: Query):
     try:
         if query.get("tracks"):
             playlist = list(
-                results_generator(subject.api.auth_manager, query["tracks"])
+                results_generator(
+                    cast(SpotifyPKCE, subject.api.auth_manager),
+                    query["tracks"],
+                )
             )
         else:
             playlist = query["objects"]

@@ -1,6 +1,6 @@
 """ StreamSort utility functions
 
-Copyright (c) 2020 IdmFoundInHim, except where otherwise credited
+Copyright (c) 2021 IdmFoundInHim, except where otherwise credited
 """
 __all__ = [
     "as_uri",
@@ -11,11 +11,13 @@ __all__ = [
     "mob_in_mob",
     "results_generator",
     "str_mob",
+    "state_only_api",
 ]
 
 from collections.abc import Iterator, Mapping
 from typing import cast
 from urllib import parse as urlparse
+from frozendict import frozendict
 
 from more_itertools import flatten
 import requests
@@ -27,7 +29,26 @@ from ._constants import (
     MOB_URL_PREFIX,
     SPID_VALID_CHARS,
 )
-from .types import Mob, Track
+from .types import Mob, State, Track
+
+
+def as_uri(uri: str):
+    """Returns the URI in standard format only if present"""
+    if uri.startswith(MOB_URL_PREFIX):
+        try:
+            url = urlparse.urlparse(uri)
+        except ValueError:
+            return ""
+        uri = MOB_URI_PREFIX + ":".join(url.path.split("/")[-2:])
+    uri_parts = uri.strip().split(":")
+    if (
+        len(uri_parts) == 3
+        and uri_parts[0] == "spotify"
+        and uri_parts[1] in MOBNAMES
+        and all(c in SPID_VALID_CHARS for c in uri_parts[2])
+    ):
+        return uri
+    return ""
 
 
 def get_header(oauth: str) -> dict:
@@ -37,6 +58,64 @@ def get_header(oauth: str) -> dict:
         "Content-Type": "application/json",
         "Authorization": f"Bearer {oauth}",
     }
+
+
+def iter_mob_uri(
+    auth: SpotifyPKCE, mob: Mob, keep_local: bool = True
+) -> Iterator[str]:
+    """Iterate over a mob's contained track uris (recursively)"""
+    return (t["uri"] for t in iter_mob_track(auth, mob, keep_local))
+
+
+def iter_mob_track(
+    auth: SpotifyPKCE, mob: Mob, keep_local: bool = True
+) -> Iterator[Track]:
+    """Iterate over a mob's contained tracks (recursively)"""
+    if objects := mob.get("objects"):
+        for obj in objects:
+            yield from iter_mob_track(auth, obj, keep_local)
+        return
+    if tracks := mob.get("tracks", mob.get("episodes")):
+        mob_tracks = results_generator(auth, tracks)
+    else:
+        mob_tracks = [mob]
+    mob_tracks = (t.get("track", t) for t in mob_tracks)
+    yield from (
+        cast(Track, t)
+        for t in mob_tracks
+        if keep_local or t.get("uri", "").startswith("spotify:track:")
+    )
+
+
+def mob_eq(mob1: Mob, mob2: Mob) -> bool:
+    """Check if two mobs have the same uri (or objects if no uris)"""
+    try:
+        return mob1["uri"] == mob2["uri"]
+    except KeyError:
+        return _ss_eq(mob1, mob2)
+
+
+def mob_in_mob(api: Spotify, obj: Mob, lst: Mob) -> bool:
+    """Check if a mob is found in another mob
+
+    All items at least contain themselves.
+    Albums are considered to contain their tracks + any
+    artists credited on those tracks. Artists are considered to contain
+    any tracks they are credited on + any albums or playlists
+    containing their tracks. Playlists contain their tracks + any
+    albums and artists represented in those tracks.
+
+    TODO doctests here
+
+    Episodes match nothing, but throw no error.
+
+    TODO that especially needs doctesting
+    """
+    if obj.get("uri", None) == lst.get("uri", False):
+        return True
+    if test := _MOB_SPECIFIC_TESTS.get(obj["type"]):
+        return test(api.auth_manager, obj, lst)
+    return False
 
 
 def results_generator(auth: SpotifyPKCE, page_zero: Mapping) -> Iterator[Mob]:
@@ -78,23 +157,36 @@ def results_generator(auth: SpotifyPKCE, page_zero: Mapping) -> Iterator[Mob]:
             yield from page["items"]
 
 
-def as_uri(uri: str):
-    """Returns the URI in standard format only if present"""
-    if uri.startswith(MOB_URL_PREFIX):
-        try:
-            url = urlparse.urlparse(uri)
-        except ValueError:
-            return ""
-        uri = MOB_URI_PREFIX + ":".join(url.path.split("/")[-2:])
-    uri_parts = uri.strip().split(":")
-    if (
-        len(uri_parts) == 3
-        and uri_parts[0] == "spotify"
-        and uri_parts[1] in MOBNAMES
-        and all(c in SPID_VALID_CHARS for c in uri_parts[2])
-    ):
-        return uri
-    return ""
+def state_only_api(api: Spotify):
+    return State(api, Mob({}), frozendict())
+
+
+_MOB_STRS = {
+    "track": '"{}" by {}{}',
+    "album": "*{}* by {}, {} songs",
+    "artist": "{}{}{}",
+    "playlist": "{}, {}{} songs",
+    "episode": '"{}" from *{}{}*',
+    "show": "*{}* from {}{}",
+    "user": "@{}{}{}",
+    "ss": ":{}{}{}",
+}
+
+
+def str_mob(mob: Mob):
+    """Constructs display string of given Mob (dict)"""
+    mob_fields = [
+        mob.get("name", mob.get("display_name")),
+        mob["artists"][0]["name"]
+        if mob.get("artists")
+        else mob.get("show", mob.get("publisher", "")),
+        mob.get("total_tracks") or mob["tracks"]["total"]
+        if mob.get("tracks")
+        else mob["episodes"]["total"]
+        if mob.get("episodes")
+        else "",
+    ]
+    return _MOB_STRS[mob["type"]].format(*mob_fields)
 
 
 def _track_in_mob(auth: SpotifyPKCE, track: Mob, mob: Mob) -> bool:
@@ -164,92 +256,6 @@ _MOB_SPECIFIC_TESTS = {
     "artist": _artist_in_mob,
     "playlist": _playlist_in_playlist,
 }
-
-
-def mob_in_mob(api: Spotify, obj: Mob, lst: Mob) -> bool:
-    """Check if a mob is found in another mob
-
-    All items at least contain themselves.
-    Albums are considered to contain their tracks + any
-    artists credited on those tracks. Artists are considered to contain
-    any tracks they are credited on + any albums or playlists
-    containing their tracks. Playlists contain their tracks + any
-    albums and artists represented in those tracks.
-
-    TODO doctests here
-
-    Episodes match nothing, but throw no error.
-
-    TODO that especially needs doctesting
-    """
-    if obj.get("uri", None) == lst.get("uri", False):
-        return True
-    if test := _MOB_SPECIFIC_TESTS.get(obj["type"]):
-        return test(api.auth_manager, obj, lst)
-    return False
-
-
-def iter_mob_uri(
-    auth: SpotifyPKCE, mob: Mob, keep_local: bool = True
-) -> Iterator[str]:
-    """Iterate over a mob's contained track uris (recursively)"""
-    return (t["uri"] for t in iter_mob_track(auth, mob, keep_local))
-
-
-def iter_mob_track(
-    auth: SpotifyPKCE, mob: Mob, keep_local: bool = True
-) -> Iterator[Track]:
-    """Iterate over a mob's contained tracks (recursively)"""
-    if objects := mob.get("objects"):
-        for obj in objects:
-            yield from iter_mob_track(auth, obj, keep_local)
-        return
-    if tracks := mob.get("tracks", mob.get("episodes")):
-        mob_tracks = results_generator(auth, tracks)
-    else:
-        mob_tracks = [mob]
-    mob_tracks = (t.get("track", t) for t in mob_tracks)
-    yield from (
-        cast(Track, t)
-        for t in mob_tracks
-        if keep_local or t.get("uri", "").startswith("spotify:track:")
-    )
-
-
-_MOB_STRS = {
-    "track": '"{}" by {}{}',
-    "album": "*{}* by {}, {} songs",
-    "artist": "{}{}{}",
-    "playlist": "{}, {}{} songs",
-    "episode": '"{}" from *{}{}*',
-    "show": "*{}* from {}{}",
-    "user": "@{}{}{}",
-    "ss": ":{}{}{}",
-}
-
-
-def str_mob(mob: Mob):
-    """Constructs display string of given Mob (dict)"""
-    mob_fields = [
-        mob.get("name", mob.get("display_name")),
-        mob["artists"][0]["name"]
-        if mob.get("artists")
-        else mob.get("show", mob.get("publisher", "")),
-        mob.get("total_tracks") or mob["tracks"]["total"]
-        if mob.get("tracks")
-        else mob["episodes"]["total"]
-        if mob.get("episodes")
-        else "",
-    ]
-    return _MOB_STRS[mob["type"]].format(*mob_fields)
-
-
-def mob_eq(mob1: Mob, mob2: Mob) -> bool:
-    """Check if two mobs have the same uri (or objects if no uris)"""
-    try:
-        return mob1["uri"] == mob2["uri"]
-    except KeyError:
-        return _ss_eq(mob1, mob2)
 
 
 def _ss_eq(ss1: Mob, ss2: Mob) -> bool:

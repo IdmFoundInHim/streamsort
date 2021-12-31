@@ -1,3 +1,7 @@
+""" StreamSort Projects Extension -- Utilities Module 
+
+Copyright (c) 2021 IdmFoundInHim, under MIT License
+"""
 from collections.abc import Sequence
 from itertools import zip_longest
 from collections.abc import Mapping

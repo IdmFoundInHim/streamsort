@@ -8,7 +8,7 @@ from collections.abc import Iterable
 from typing import Sequence, cast
 
 from frozendict import frozendict
-from spotipy import Spotify
+from spotipy import Spotify, SpotifyPKCE
 from streamsort import (
     SimplifiedObjectError,
     iter_mob_track,
@@ -81,7 +81,7 @@ def _proj_projects_filter_singles(
             project["objects"] = [
                 t
                 for t in results_generator(
-                    api.auth_manager,
+                    cast(SpotifyPKCE, api.auth_manager),
                     cast(
                         dict,
                         api.album_tracks(project["root_album"]["uri"]),
