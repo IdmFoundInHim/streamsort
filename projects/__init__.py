@@ -14,4 +14,4 @@ __all__ = ["_sentences_"] + sentences__all__
 
 from .sentences import *
 
-_sentences_ = {"projects": proj_projects}
+_sentences_ = {"projects": ss_projects}

@@ -14,4 +14,4 @@ __all__ = ["_sentences_"] + sentences__all__
 
 from .sentences import *
 
-_sentences_ = {"shuffle": shuf_shuffle}
+_sentences_ = {"shuffle": ss_shuffle}

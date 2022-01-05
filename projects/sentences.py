@@ -2,7 +2,7 @@
 
 Copyright (c) 2021 IdmFoundInHim, under MIT License
 """
-__all__ = ["proj_projects"]
+__all__ = ["ss_projects"]
 
 from collections.abc import Iterable
 from typing import Sequence, cast
@@ -20,7 +20,7 @@ from streamsort.types import Mob, Query, State
 from .utilities import categorize_projects, single_in_album
 
 
-def proj_projects(subject: State, query: Query) -> State:
+def ss_projects(subject: State, query: Query) -> State:
     """Split a list-like mob by release format (album/single)"""
     if not query:
         query = subject.mob
@@ -29,12 +29,12 @@ def proj_projects(subject: State, query: Query) -> State:
     print('    NOTE: "projects" may take a while')
     tracks = iter_mob_track(cast(SpotifyPKCE, api.auth_manager), query_mob)
     try:
-        projects_prefilter = _proj_projects_divide(tracks)
+        projects_prefilter = _divide(tracks)
     except SimplifiedObjectError:
-        projects_prefilter = _proj_projects_divide(
+        projects_prefilter = _divide(
             cast(Mob, subject.api.track(t["uri"])) for t in tracks
         )
-    projects = _proj_projects_filter_singles(subject.api, projects_prefilter)
+    projects = _filter_singles(subject.api, projects_prefilter)
     out_mob = {
         "type": "ss",
         "name": f"Projects: {query_mob['name']}",
@@ -43,7 +43,7 @@ def proj_projects(subject: State, query: Query) -> State:
     return State(api, Mob(frozendict(out_mob)), subject[2])
 
 
-def _proj_projects_divide(tracks: Iterable[Mob]) -> list[dict]:
+def _divide(tracks: Iterable[Mob]) -> list[dict]:
     albums = {}
     for track in tracks:
         try:
@@ -63,9 +63,7 @@ def _proj_projects_divide(tracks: Iterable[Mob]) -> list[dict]:
     return list(albums.values())
 
 
-def _proj_projects_filter_singles(
-    api: Spotify, projects: Sequence[dict]
-) -> list[Mob]:
+def _filter_singles(api: Spotify, projects: Sequence[dict]) -> list[Mob]:
     for project in projects:
         # Remove duplicates and put in order
         project_ids = [t["id"] for t in project["objects"]]

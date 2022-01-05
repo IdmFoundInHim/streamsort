@@ -2,7 +2,7 @@
 
 Copyright (c) 2021 IdmFoundInHim, under MIT License
 """
-__all__ = ["shuf_shuffle"]
+__all__ = ["ss_shuffle"]
 
 import random
 from typing import cast
@@ -21,7 +21,7 @@ from streamsort import (
 from streamsort.types import Mob, Query, State
 
 
-def shuf_shuffle(subject: State, query: Query):
+def ss_shuffle(subject: State, query: Query):
     """(ALPHA: Behavior subject to change) Shuffle a list of mobs
 
     Currently uploads result of shuffling the subject to the queried
