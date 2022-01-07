@@ -4,6 +4,8 @@ Copyright (c) 2021 IdmFoundInHim, under MIT License
 """
 __all__ = [
     "io_inject",
+    "IO_CONFIRM",
+    "IO_NOTIFY",
     "ss_add",
     "ss_all",
     "ss_new",
