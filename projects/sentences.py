@@ -27,7 +27,9 @@ def ss_projects(subject: State, query: Query) -> State:
     api = subject.api
     query_mob = ss_open(subject, query).mob
     print('    NOTE: "projects" may take a while')
-    tracks = iter_mob_track(cast(SpotifyPKCE, api.auth_manager), query_mob)
+    tracks = list(
+        iter_mob_track(cast(SpotifyPKCE, api.auth_manager), query_mob)
+    )
     try:
         projects_prefilter = _divide(tracks)
     except SimplifiedObjectError:
