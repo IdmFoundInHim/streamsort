@@ -153,7 +153,10 @@ def shell(extensions: dict[str, Sentence]) -> int:
                 print("    ERROR: The Spotify operation failed")
             except ValueError as err:
                 print(f"    ERROR: {err.args[0]}")
-            except requests.exceptions.ConnectionError:
+            except (
+                requests.exceptions.ConnectionError,
+                requests.exceptions.ReadTimeout,
+            ):
                 print("    ERROR: Connection was lost. Reconnecting...")
                 state = State(login().api, state[1], state[2])
         status = IDLE
