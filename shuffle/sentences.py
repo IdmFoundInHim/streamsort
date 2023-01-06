@@ -24,7 +24,7 @@ from streamsort.types import Mob, Query, State
 def ss_shuffle(subject: State, query: Query):
     """(ALPHA: Behavior subject to change) Shuffle a list of mobs
 
-    Currently uploads result of shuffling the subject to the queried
+    Currently uploads result of shuffling the query to the subject
     playlist.
 
     Only shuffles the topmost layer of an SS Object, allowing groups
