@@ -111,9 +111,9 @@ def ss_open(subject: State, query: Query) -> State:
     functions may be supplied through `io_inject`.
     """
     if not query:
-        return State(subject[0], cast(Mob, subject.api.me()))
+        return State(subject[0], cast(Mob, subject.api.me()), subject[2])
     if isinstance(query, Mapping):
-        return State(subject[0], query)
+        return State(subject[0], query, subject[2])
     search_query = cast(str, query)
     out = _ss_open_process_query(search_query)(subject, search_query)
     if out is None:
