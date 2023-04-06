@@ -337,18 +337,18 @@ def _ss_open_playlist_familiar(
     auth = cast(SpotifyPKCE, api.auth_manager)
     yield (
         cast(Playlist, p)
-        for p in results_generator(auth, results)
+        for p in results['items']
         if p["id"] == subject[1].get("id", False)
     )
     usrid = cast(dict, api.me())["id"]
     yield (
         cast(Playlist, p)
-        for p in results_generator(auth, results)
+        for p in results['items']
         if p["owner"]["id"] == usrid
     )
     yield (
         cast(Playlist, p)
-        for p in results_generator(auth, results)
+        for p in results['items']
         if api.playlist_is_following(p["id"], [usrid])
     )
     yield cast(Iterator[Playlist], results_generator(auth, results))
@@ -438,12 +438,12 @@ def _ss_open_familiar(
     auth = cast(SpotifyPKCE, api.auth_manager)
     yield (
         r
-        for r in results_generator(auth, results)
+        for r in results['items']
         if mob_in_mob(api, r, subject[1])
     )
     yield (
         r
-        for r in results_generator(auth, results)
+        for r in results['items']
         if any(
             cast(
                 list,
@@ -456,12 +456,12 @@ def _ss_open_familiar(
     liked_songs = liked_songs_cache_check(api)
     yield (
         r
-        for r in results_generator(auth, results)
+        for r in results['items']
         if r["id"] in liked_songs[mobname]
     )
     yield (
         r
-        for r in results_generator(auth, results)
+        for r in results['items']
         if any(
             a in liked_songs["artist"] for a in r.get("artists") or [r["id"]]
         )
