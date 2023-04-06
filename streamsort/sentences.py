@@ -36,7 +36,7 @@ from .utilities import (
     str_mob,
 )
 
-LIMIT = 50
+LIMIT = 5
 TypeSpecificSearch = Callable[[State, str], Mob | None]
 MultipleChoiceFunction = Callable[[Iterator[Mob]], Mob | None]
 
