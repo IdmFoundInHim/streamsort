@@ -446,7 +446,7 @@ def _ss_open_familiar(
     for index, result in enumerate(results['items']):
         artists_ungrouped += [(index, artist['id']) for artist in result.get('artists', [result])]
     indices_all, artist_ids = zip(*artists_ungrouped)
-    for secondary_index, following in enumerate(api.current_user_following_artists(*artist_ids)):
+    for secondary_index, following in enumerate(api.current_user_following_artists(artist_ids)):
         if following:
             indices_filtered.add(indices_all[secondary_index])
     yield (
