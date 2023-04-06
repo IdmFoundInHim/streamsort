@@ -446,7 +446,10 @@ def _ss_open_familiar(
     for index, result in enumerate(results['items']):
         artists_ungrouped += [(index, artist['id']) for artist in result.get('artists', [result])]
     indices_all, artist_ids = zip(*artists_ungrouped)
-    for secondary_index, following in enumerate(api.current_user_following_artists(artist_ids)):
+    following_bools = []
+    for fifty_artist_ids in chunked(artist_ids, 50):
+        following_bools += api.current_user_following_artists(fifty_artist_ids)
+    for secondary_index, following in enumerate(following_bools):
         if following:
             indices_filtered.add(indices_all[secondary_index])
     yield (
