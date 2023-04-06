@@ -441,18 +441,18 @@ def _ss_open_familiar(
         for r in results['items']
         if mob_in_mob(api, r, subject[1])
     )
+    artists_ungrouped = []
+    indices_filtered = set()
+    for index, result in enumerate(results['items']):
+        artists_ungrouped += [(index, artist['id']) for artist in result.get('artists', [result])]
+    indices_all, artist_ids = zip(*artists_ungrouped)
+    for secondary_index, following in enumerate(api.current_user_following_artists(*artist_ids)):
+        if following:
+            indices_filtered.add(indices_all[secondary_index])
     yield (
-        r
-        for r in results['items']
-        if any(
-            cast(
-                list,
-                api.current_user_following_artists(
-                    a["id"] for a in r.get("artists", [r])
-                ),
-            )
-        )
-    )  # slow(est)
+        results['items'][index]
+        for index in indices_filtered
+    )
     liked_songs = liked_songs_cache_check(api)
     yield (
         r
