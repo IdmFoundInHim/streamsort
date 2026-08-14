@@ -1,7 +1,8 @@
-""" Default I/O functions for StreamSort
+"""Default I/O functions for StreamSort
 
 Copyright (c) 2021 IdmFoundInHim, under MIT License
 """
+
 __all__ = ["confirm_action", "notify_user"]
 
 notify_user = print

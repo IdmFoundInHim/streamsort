@@ -1,7 +1,8 @@
-""" Special exceptions for StreamSort
+"""Special exceptions for StreamSort
 
 Copyright (c) 2021 IdmFoundInHim, under MIT License
 """
+
 __all__ = [
     "NoResultsError",
     "UnexpectedResponseException",

@@ -1,7 +1,8 @@
-""" Wrappers for the Spotify API in format f(State, Param) -> State
+"""Wrappers for the Spotify API in format f(State, Param) -> State
 
 Copyright (c) 2021 IdmFoundInHim, under MIT License
 """
+
 __all__ = [
     "io_inject",
     "IO_CONFIRM",
@@ -232,13 +233,13 @@ def ss_new(subject: State, query: Query) -> State:
         # raise UnsupportedQueryError('"new" requires a query')
         raise UnsupportedQueryError("new", "")
     name = str_mob(query) if isinstance(query, Mapping) else query
-    playlist_id = cast(
-        str,
+    playlist = cast(
+        Mob,
         subject.api.user_playlist_create(
             cast(Mob, subject.api.me())["id"], name, False
         ),
     )
-    return ss_open(subject, playlist_id)
+    return ss_open(subject, playlist)
 
 
 def _ss_open_process_query(query: str) -> TypeSpecificSearch:
@@ -273,9 +274,11 @@ def _ss_open_general(subject: State, query: str) -> Mob | None:
     api = subject[0]
     results = cast(dict, api.search(query, LIMIT, type=",".join(MOBNAMES)))
     results = {
-        x: _ss_open_familiar(subject, results[x + "s"], x)
-        if x != "playlist"
-        else _ss_open_playlist_familiar(subject, results["playlists"])
+        x: (
+            _ss_open_familiar(subject, results[x + "s"], x)
+            if x != "playlist"
+            else _ss_open_playlist_familiar(subject, results["playlists"])
+        )
         for x in MOBNAMES
     }
     for result_gens in roundrobin(
@@ -337,18 +340,18 @@ def _ss_open_playlist_familiar(
     auth = cast(SpotifyPKCE, api.auth_manager)
     yield (
         cast(Playlist, p)
-        for p in results['items']
+        for p in results["items"]
         if p["id"] == subject[1].get("id", False)
     )
     usrid = cast(dict, api.me())["id"]
     yield (
         cast(Playlist, p)
-        for p in results['items']
+        for p in results["items"]
         if p["owner"]["id"] == usrid
     )
     yield (
         cast(Playlist, p)
-        for p in results['items']
+        for p in results["items"]
         if api.playlist_is_following(p["id"], [usrid])
     )
     yield cast(Iterator[Playlist], results_generator(auth, results))
@@ -436,15 +439,13 @@ def _ss_open_familiar(
 ) -> Iterator[Iterator[Mob]]:
     api = subject[0]
     auth = cast(SpotifyPKCE, api.auth_manager)
-    yield (
-        r
-        for r in results['items']
-        if mob_in_mob(api, r, subject[1])
-    )
+    yield (r for r in results["items"] if mob_in_mob(api, r, subject[1]))
     artists_ungrouped = []
     indices_filtered = set()
-    for index, result in enumerate(results['items']):
-        artists_ungrouped += [(index, artist['id']) for artist in result.get('artists', [result])]
+    for index, result in enumerate(results["items"]):
+        artists_ungrouped += [
+            (index, artist["id"]) for artist in result.get("artists", [result])
+        ]
     indices_all, artist_ids = zip(*artists_ungrouped)
     following_bools = []
     for fifty_artist_ids in chunked(artist_ids, 50):
@@ -452,19 +453,12 @@ def _ss_open_familiar(
     for secondary_index, following in enumerate(following_bools):
         if following:
             indices_filtered.add(indices_all[secondary_index])
-    yield (
-        results['items'][index]
-        for index in indices_filtered
-    )
+    yield (results["items"][index] for index in indices_filtered)
     liked_songs = liked_songs_cache_check(api)
+    yield (r for r in results["items"] if r["id"] in liked_songs[mobname])
     yield (
         r
-        for r in results['items']
-        if r["id"] in liked_songs[mobname]
-    )
-    yield (
-        r
-        for r in results['items']
+        for r in results["items"]
         if any(
             a in liked_songs["artist"] for a in r.get("artists") or [r["id"]]
         )
@@ -512,9 +506,11 @@ def _ss_add_to_playlist(api: Spotify, destination: Mob, target: Mob):
 def _ss_add_to_ss(ss_obj: Mob, new_mob: Mob) -> Mob:
     return type(ss_obj)(
         **{
-            k: type(ss_obj[k])([new_mob, *ss_obj[k]])
-            if k == "objects"
-            else ss_obj[k]
+            k: (
+                type(ss_obj[k])([new_mob, *ss_obj[k]])
+                if k == "objects"
+                else ss_obj[k]
+            )
             for k in ss_obj
         }
     )

@@ -1,7 +1,8 @@
-""" StreamSort utility functions
+"""StreamSort utility functions
 
 Copyright (c) 2021 IdmFoundInHim, except where otherwise credited
 """
+
 __all__ = [
     "as_uri",
     "get_header",
@@ -177,14 +178,16 @@ def str_mob(mob: Mob):
     """Constructs display string of given Mob (dict)"""
     mob_fields = [
         mob.get("name", mob.get("display_name")),
-        mob["artists"][0]["name"]
-        if mob.get("artists")
-        else mob.get("show", mob.get("publisher", "")),
-        mob.get("total_tracks") or mob["tracks"]["total"]
-        if mob.get("tracks")
-        else mob["episodes"]["total"]
-        if mob.get("episodes")
-        else "",
+        (
+            mob["artists"][0]["name"]
+            if mob.get("artists")
+            else mob.get("show", mob.get("publisher", ""))
+        ),
+        (
+            mob.get("total_tracks") or mob["tracks"]["total"]
+            if mob.get("tracks")
+            else mob["episodes"]["total"] if mob.get("episodes") else ""
+        ),
     ]
     return _MOB_STRS[mob["type"]].format(*mob_fields)
 

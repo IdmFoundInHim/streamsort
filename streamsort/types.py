@@ -1,7 +1,8 @@
-""" Setup for static type checking and non-trivial casting functions
+"""Setup for static type checking and non-trivial casting functions
 
 Copyright (c) 2021 IdmFoundInHim, under MIT License
 """
+
 from __future__ import annotations
 
 __all__ = [

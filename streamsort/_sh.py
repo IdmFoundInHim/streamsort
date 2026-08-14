@@ -1,4 +1,4 @@
-""" CLI for StreamSort
+"""CLI for StreamSort
 
 Copyright (c) 2021 IdmFoundInHim, under MIT License
 
@@ -72,6 +72,7 @@ Implementation:
       3. branch: Watching for keywords, but otherwise acts like free
     * In reserved mode, non-reserved tokens are new subshell names
 """
+
 __all__ = ["shell", "process_line", "login", "logout"]
 
 import os

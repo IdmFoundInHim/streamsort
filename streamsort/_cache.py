@@ -1,7 +1,8 @@
-""" Caching functions for StreamSort
+"""Caching functions for StreamSort
 
 Copyright (c) 2021 IdmFoundInHim, under MIT License
 """
+
 __all__ = ["liked_songs_cache_check"]
 
 import json

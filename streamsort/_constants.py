@@ -1,7 +1,8 @@
-""" Package-level Constants for StreamSort
+"""Package-level Constants for StreamSort
 
 Copyright (c) 2021 IdmFoundInHim, under MIT License
 """
+
 __all__ = [
     "CLIENT_ID",
     "REDIRECT_URI",
