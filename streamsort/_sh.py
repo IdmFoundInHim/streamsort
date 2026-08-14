@@ -78,6 +78,7 @@ __all__ = ["shell", "process_line", "login", "logout"]
 import os
 import itertools
 from collections.abc import Callable, Iterator, Mapping
+import sys
 from typing import cast
 
 from frozendict import frozendict
@@ -154,7 +155,16 @@ def shell(extensions: dict[str, Sentence]) -> int:
     )
     status = IDLE
     state = login()
-    while (line := input(str_mob(state.mob) + " > ")) != "exit":
+
+    def get_line():
+        try:
+            return input(str_mob(state.mob) + " > ")
+        except KeyboardInterrupt:
+            print()
+            print("(Type 'exit' to exit.)")
+            return ""
+
+    while (line := get_line()) != "exit":
         status = WORK
         if line[:6] == "logout":
             if logout():
@@ -181,6 +191,14 @@ def shell(extensions: dict[str, Sentence]) -> int:
             ):
                 print("    ERROR: Connection was lost. Reconnecting...")
                 state = State(login().api, state[1], state[2])
+            except KeyboardInterrupt:
+                try:
+                    print()
+                    input(
+                        "Interrupted. Press any key to continue or interrupt again to force exit."
+                    )
+                except KeyboardInterrupt:
+                    sys.exit(status)
         status = IDLE
     status = SAFE
     return status
