@@ -129,9 +129,17 @@ def ss_open(subject: State, query: Query) -> State:
 
 
 def ss_current(subject: State, query: Query):
+    """Change the subject to the currently playing item
+
+    With no query, gets the current album. Different queries get
+    different items: track, artist, or context. Context is where
+    you started playing, such as a playlist or artist page.
+    """
     if type(query) is not str:
         raise UnsupportedQueryError("now", "")
-    current = cast(dict, subject.api.currently_playing())
+    current = subject.api.currently_playing()
+    if type(current) is not dict:
+        raise NoResultsError
 
     def type_selected(*types: str):
         return any(word.startswith(query) for word in types)
