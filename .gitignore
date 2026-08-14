@@ -26,3 +26,4 @@ env/
 .cache-*
 
 .notes*
+.vscode
