@@ -84,7 +84,13 @@ from frozendict import frozendict
 import requests.exceptions
 from spotipy import Spotify, SpotifyException, SpotifyPKCE
 
-from ._constants import CACHE_PATH, CLIENT_ID, REDIRECT_URI, SCOPE
+from ._constants import (
+    CACHE_PATH,
+    CLIENT_ID,
+    REDIRECT_URI,
+    REDIRECT_URI_HEADLESS,
+    SCOPE,
+)
 from .errors import NoResultsError
 from .sentences import ss_add, ss_all, ss_new, ss_open, ss_play, ss_remove
 from .types import Mob, Query, Sentence, State
@@ -97,15 +103,21 @@ WORK = 2
 
 def login() -> State:
     """Returns an authorized Spotify object and user details"""
-    spotify = Spotify(
-        auth_manager=SpotifyPKCE(
-            client_id=CLIENT_ID,
-            redirect_uri=REDIRECT_URI,
-            cache_path=CACHE_PATH,
-            scope=SCOPE,
+    kwargs = {"client_id": CLIENT_ID, "cache_path": CACHE_PATH, "scope": SCOPE}
+    try:
+        spotify = Spotify(
+            auth_manager=SpotifyPKCE(**kwargs, redirect_uri=REDIRECT_URI)
         )
-    )
-    user = cast(Mob, spotify.me())
+        user = cast(Mob, spotify.me())
+    except KeyboardInterrupt:
+        spotify = Spotify(
+            auth_manager=SpotifyPKCE(
+                **kwargs,
+                redirect_uri=REDIRECT_URI_HEADLESS,
+                open_browser=False,
+            )
+        )
+        user = cast(Mob, spotify.me())
     return State(spotify, user)
 
 
