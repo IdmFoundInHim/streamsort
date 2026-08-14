@@ -24,7 +24,7 @@ import string
 from spotipy import Spotify
 
 CLIENT_ID = "6400ca69c7dd4b969f2620d6d2647b03"
-REDIRECT_URI = "http://localhost:8080"
+REDIRECT_URI = "http://127.0.0.1:8080"
 CACHE_DIR = ".cache"
 CACHE_PATH = os.path.join(CACHE_DIR, "api.json")
 MOB_URI_PREFIX = "spotify:"
