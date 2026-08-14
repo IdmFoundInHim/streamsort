@@ -1,7 +1,8 @@
-""" StreamSort Projects Extension -- Sentences Module 
+"""StreamSort Projects Extension -- Sentences Module
 
 Copyright (c) 2021 IdmFoundInHim, under MIT License
 """
+
 __all__ = ["ss_projects"]
 
 from collections.abc import Iterable

@@ -1,7 +1,8 @@
-""" StreamSort Shuffle Extension -- Sentences Module 
+"""StreamSort Shuffle Extension -- Sentences Module
 
 Copyright (c) 2021 IdmFoundInHim, under MIT License
 """
+
 __all__ = ["ss_shuffle"]
 
 import random

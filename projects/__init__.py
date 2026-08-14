@@ -1,4 +1,4 @@
-""" StreamSort Projects Extension
+"""StreamSort Projects Extension
 
 Copyright (c) 2021 IdmFoundInHim, under MIT License
 
@@ -7,6 +7,7 @@ Notice that a `_sentences_` attribute is included in the top-level
 package. This is required for the StreamSort shell to properly import
 the extension.
 """
+
 # pyright: reportUnsupportedDunderAll=false
 from .sentences import __all__ as sentences__all__
 
