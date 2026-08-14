@@ -42,9 +42,15 @@ MOB_GET_FUNCTIONS = {
     "user": Spotify.user,
 }
 NUMSUGGESTIONS = 3
-SCOPE = (
-    "user-library-read user-follow-read playlist-read-private "
-    + "playlist-modify-private playlist-modify-public "
-    + "user-modify-playback-state"
+SCOPE = " ".join(
+    [
+        "user-library-read",
+        "user-follow-read",
+        "playlist-read-private",
+        "playlist-modify-private",
+        "playlist-modify-public",
+        "user-modify-playback-state",
+        "user-read-currently-playing",
+    ]
 )
 EXTENSION_ATTRIBUTE = "_sentences_"

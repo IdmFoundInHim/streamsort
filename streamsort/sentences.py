@@ -9,6 +9,7 @@ __all__ = [
     "IO_NOTIFY",
     "ss_add",
     "ss_all",
+    "ss_current",
     "ss_new",
     "ss_open",
     "ss_play",
@@ -25,7 +26,12 @@ from spotipy import Spotify, SpotifyPKCE
 
 from ._cache import liked_songs_cache_check
 from ._constants import MOB_GET_FUNCTIONS, MOBNAMES, NUMSUGGESTIONS
-from .errors import NoResultsError, UnsupportedQueryError, UnsupportedVerbError
+from .errors import (
+    NoResultsError,
+    UnexpectedResponseException,
+    UnsupportedQueryError,
+    UnsupportedVerbError,
+)
 from ._io import confirm_action, notify_user
 from .types import Album, Artist, Mob, Playlist, State, Track, Query
 from .utilities import (
@@ -120,6 +126,28 @@ def ss_open(subject: State, query: Query) -> State:
     if out is None:
         raise NoResultsError
     return State(subject[0], out, subject[2])
+
+
+def ss_current(subject: State, query: Query):
+    if type(query) is not str:
+        raise UnsupportedQueryError("now", "")
+    current = cast(dict, subject.api.currently_playing())
+
+    def type_selected(*types: str):
+        return any(word.startswith(query) for word in types)
+
+    try:
+        if not query or type_selected("album"):
+            link_object = current["item"]["album"]
+        elif type_selected("context", "playlist"):
+            link_object = current["context"]
+        elif type_selected("track", "song"):
+            link_object = current["item"]
+        elif type_selected("artist"):
+            link_object = current["item"]["artists"][0]
+    except KeyError:
+        raise UnexpectedResponseException
+    return ss_open(subject, link_object["uri"])
 
 
 def ss_add(subject: State, query: Query) -> State:

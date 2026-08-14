@@ -92,7 +92,15 @@ from ._constants import (
     SCOPE,
 )
 from .errors import NoResultsError
-from .sentences import ss_add, ss_all, ss_new, ss_open, ss_play, ss_remove
+from .sentences import (
+    ss_add,
+    ss_all,
+    ss_current,
+    ss_new,
+    ss_open,
+    ss_play,
+    ss_remove,
+)
 from .types import Mob, Query, Sentence, State
 from .utilities import iter_mob_track, results_generator, str_mob
 
@@ -140,6 +148,7 @@ def shell(extensions: dict[str, Sentence]) -> int:
             "all": ss_all,
             "new": ss_new,
             "get": ss_open,
+            "current": ss_current,
             **extensions,
         }
     )
