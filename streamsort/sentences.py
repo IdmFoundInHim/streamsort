@@ -368,18 +368,18 @@ def _ss_open_playlist_familiar(
     auth = cast(SpotifyPKCE, api.auth_manager)
     yield (
         cast(Playlist, p)
-        for p in results["items"]
+        for p in results_generator(auth, results)
         if p["id"] == subject[1].get("id", False)
     )
     usrid = cast(dict, api.me())["id"]
     yield (
         cast(Playlist, p)
-        for p in results["items"]
+        for p in results_generator(auth, results)
         if p["owner"]["id"] == usrid
     )
     yield (
         cast(Playlist, p)
-        for p in results["items"]
+        for p in results_generator(auth, results)
         if api.playlist_is_following(p["id"], [usrid])
     )
     yield cast(Iterator[Playlist], results_generator(auth, results))
@@ -467,26 +467,33 @@ def _ss_open_familiar(
 ) -> Iterator[Iterator[Mob]]:
     api = subject[0]
     auth = cast(SpotifyPKCE, api.auth_manager)
-    yield (r for r in results["items"] if mob_in_mob(api, r, subject[1]))
-    artists_ungrouped = []
-    indices_filtered = set()
-    for index, result in enumerate(results["items"]):
-        artists_ungrouped += [
-            (index, artist["id"]) for artist in result.get("artists", [result])
-        ]
-    indices_all, artist_ids = zip(*artists_ungrouped)
-    following_bools = []
-    for fifty_artist_ids in chunked(artist_ids, 50):
-        following_bools += api.current_user_following_artists(fifty_artist_ids)
-    for secondary_index, following in enumerate(following_bools):
-        if following:
-            indices_filtered.add(indices_all[secondary_index])
-    yield (results["items"][index] for index in indices_filtered)
+    yield (
+        r
+        for r in results_generator(auth, results)
+        if mob_in_mob(api, r, subject[1])
+    )
+    yield (
+        r
+        for r in results_generator(auth, results)
+        if any(
+            cast(
+                list,
+                api.current_user_following_artists(
+                    a["id"] for a in r.get("artists", [r])
+                ),
+            )
+        )
+    )  # slow(est)
     liked_songs = liked_songs_cache_check(api)
     yield (r for r in results["items"] if r["id"] in liked_songs[mobname])
     yield (
         r
-        for r in results["items"]
+        for r in results_generator(auth, results)
+        if r["id"] in liked_songs[mobname]
+    )
+    yield (
+        r
+        for r in results_generator(auth, results)
         if any(
             a in liked_songs["artist"] for a in r.get("artists") or [r["id"]]
         )
